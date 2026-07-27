@@ -67,7 +67,7 @@ export const gamesData: GameInfo[] = [
     title: 'Number Predict & Win',
     slug: 'number-predict',
     description: '1 to 100 mystery grid! Pay 10 coins to flip a tile and instantly win cash multipliers!',
-    image: '/images/number predection.png',
+    image: '/images/number_predict_cover.jpg',
     isProtected: true,
     category: 'Luck & Jackpot',
     playersCount: '6,200 Active',

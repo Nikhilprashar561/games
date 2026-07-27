@@ -15,9 +15,9 @@ export default function TicTacToePage() {
 
   const calculateWinner = (squares: BoardState) => {
     const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6],
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+      [0, 4, 8], [2, 4, 6],           // Diagonals
     ];
     for (let i = 0; i < lines.length; i++) {
       const [a, b, c] = lines[i];
@@ -68,7 +68,7 @@ export default function TicTacToePage() {
     if (winCheck?.winner) {
       if (winCheck.winner === 'X') {
         setScores((prev) => ({ ...prev, x: prev.x + 1 }));
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
       } else if (winCheck.winner === 'O') {
         setScores((prev) => ({ ...prev, o: prev.o + 1 }));
       } else {
@@ -77,7 +77,7 @@ export default function TicTacToePage() {
     } else {
       setIsXNext(!isXNext);
       if (vsAI && isXNext) {
-        setTimeout(() => makeAIMove(newBoard), 400);
+        setTimeout(() => makeAIMove(newBoard), 350);
       }
     }
   };
@@ -85,6 +85,23 @@ export default function TicTacToePage() {
   const resetGame = () => {
     setBoard(Array(9).fill(null));
     setIsXNext(true);
+  };
+
+  // Determine line direction & coordinates for animated strike-through line
+  const getLineClass = (line: number[]) => {
+    if (!line || line.length !== 3) return '';
+    const sorted = [...line].sort((a, b) => a - b).join(',');
+    switch (sorted) {
+      case '0,1,2': return 'top-[16.6%] left-4 right-4 h-1.5 w-[calc(100%-2rem)] -translate-y-1/2';
+      case '3,4,5': return 'top-1/2 left-4 right-4 h-1.5 w-[calc(100%-2rem)] -translate-y-1/2';
+      case '6,7,8': return 'top-[83.3%] left-4 right-4 h-1.5 w-[calc(100%-2rem)] -translate-y-1/2';
+      case '0,3,6': return 'left-[16.6%] top-4 bottom-4 w-1.5 h-[calc(100%-2rem)] -translate-x-1/2';
+      case '1,4,7': return 'left-1/2 top-4 bottom-4 w-1.5 h-[calc(100%-2rem)] -translate-x-1/2';
+      case '2,5,8': return 'left-[83.3%] top-4 bottom-4 w-1.5 h-[calc(100%-2rem)] -translate-x-1/2';
+      case '0,4,8': return 'top-1/2 left-1/2 w-[130%] h-1.5 -translate-x-1/2 -translate-y-1/2 rotate-45';
+      case '2,4,6': return 'top-1/2 left-1/2 w-[130%] h-1.5 -translate-x-1/2 -translate-y-1/2 -rotate-45';
+      default: return '';
+    }
   };
 
   return (
@@ -97,21 +114,22 @@ export default function TicTacToePage() {
         <span>Back to All Games</span>
       </Link>
 
-      <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl">
+      {/* Main Container: Pure High-Contrast Dark & White Theme inside Tic Tac Toe */}
+      <div className="rounded-3xl p-6 sm:p-10 border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white shadow-2xl transition-colors duration-300">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-black/20 dark:border-white/20">
           <div>
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-bold uppercase mb-1">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Public Free Play Game</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">
-              Tic Tac Toe Arena
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight font-['Space_Grotesk']">
+              Tic Tac Toe
             </h1>
           </div>
 
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center bg-black/5 dark:bg-white/10 p-1.5 rounded-2xl border border-black/20 dark:border-white/20">
             <button
               onClick={() => {
                 setVsAI(true);
@@ -119,12 +137,12 @@ export default function TicTacToePage() {
               }}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 vsAI
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-black text-white dark:bg-white dark:text-black shadow-md'
+                  : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
               }`}
             >
               <Bot className="w-4 h-4" />
-              <span>vs AI Bot</span>
+              <span>vs Computer</span>
             </button>
             <button
               onClick={() => {
@@ -133,8 +151,8 @@ export default function TicTacToePage() {
               }}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 !vsAI
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-black text-white dark:bg-white dark:text-black shadow-md'
+                  : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -143,72 +161,85 @@ export default function TicTacToePage() {
           </div>
         </div>
 
-        {/* Score Board */}
-        <div className="grid grid-cols-3 gap-4 mb-8 max-w-md mx-auto text-center">
-          <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
-            <p className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase">Player X</p>
-            <p className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400">{scores.x}</p>
+        {/* Pure Black & White Score Board */}
+        <div className="grid grid-cols-3 gap-4 mb-8 max-w-md mx-auto text-center font-['Space_Grotesk']">
+          <div className="p-3.5 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
+            <p className="text-xs font-black uppercase tracking-wider">Player X</p>
+            <p className="text-2xl font-black mt-0.5">{scores.x}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-slate-500/10 border border-slate-500/20">
-            <p className="text-xs font-bold text-slate-500 uppercase">Draws</p>
-            <p className="text-2xl font-extrabold text-slate-500">{scores.draws}</p>
+          <div className="p-3.5 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
+            <p className="text-xs font-black uppercase tracking-wider">Draws</p>
+            <p className="text-2xl font-black mt-0.5">{scores.draws}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-            <p className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase">
+          <div className="p-3.5 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
+            <p className="text-xs font-black uppercase tracking-wider">
               {vsAI ? 'Bot (O)' : 'Player O'}
             </p>
-            <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">{scores.o}</p>
+            <p className="text-2xl font-black mt-0.5">{scores.o}</p>
           </div>
         </div>
 
-        {/* Winner Banner / Turn State */}
-        <div className="text-center mb-6">
+        {/* Turn State / Winner Banner */}
+        <div className="text-center mb-8">
           {result ? (
-            <div className="inline-flex items-center space-x-2 px-6 py-2 rounded-2xl bg-emerald-600 text-white font-black text-lg shadow-lg animate-bounce">
-              <Trophy className="w-5 h-5 text-amber-300" />
+            <div className="inline-flex items-center space-x-2 px-8 py-3 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-xl animate-bounce border border-black dark:border-white">
+              <Trophy className="w-5 h-5" />
               <span>
-                {result.winner === 'Draw' ? "It's a Draw!" : `Player ${result.winner} Wins! 🎉`}
+                {result.winner === 'Draw' ? "Game Ended in a Draw!" : `Player ${result.winner} Won! 🎉`}
               </span>
             </div>
           ) : (
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+            <p className="text-base font-bold">
               Current Turn:{' '}
-              <span className={isXNext ? 'text-cyan-500 font-bold' : 'text-rose-500 font-bold'}>
+              <span className="font-black underline uppercase">
                 {isXNext ? 'Player X' : vsAI ? 'Computer thinking...' : 'Player O'}
               </span>
             </p>
           )}
         </div>
 
-        {/* 3x3 Grid */}
-        <div className="grid grid-cols-3 gap-3 max-w-xs sm:max-w-sm mx-auto aspect-square mb-8">
-          {board.map((cell, idx) => {
-            const isWinningCell = result?.line.includes(idx);
-            return (
-              <button
-                key={idx}
-                onClick={() => handleClick(idx)}
-                className={`rounded-2xl text-4xl sm:text-5xl font-black flex items-center justify-center transition-all duration-200 shadow-md ${
-                  cell === null
-                    ? 'bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700'
-                    : cell === 'X'
-                    ? 'bg-cyan-500/10 text-cyan-500 border-2 border-cyan-500/40'
-                    : 'bg-rose-500/10 text-rose-500 border-2 border-rose-500/40'
-                } ${isWinningCell ? 'ring-4 ring-amber-400 bg-amber-400/20' : ''}`}
-              >
-                {cell}
-              </button>
-            );
-          })}
+        {/* 3x3 Grid: Pure Dark/White Styling with Animated Winning Line Stroke */}
+        <div className="relative max-w-xs sm:max-w-sm mx-auto aspect-square mb-8">
+          
+          {/* Grid Squares */}
+          <div className="w-full h-full grid grid-cols-3 gap-3">
+            {board.map((cell, idx) => {
+              const isWinningCell = result?.line.includes(idx);
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleClick(idx)}
+                  className={`rounded-2xl text-4xl sm:text-6xl font-black flex items-center justify-center transition-all duration-300 shadow-lg select-none ${
+                    cell === null
+                      ? 'bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 border-2 border-black/20 dark:border-white/20 hover:scale-105'
+                      : 'bg-black text-white dark:bg-white dark:text-black border-2 border-black dark:border-white'
+                  } ${isWinningCell ? 'scale-105 ring-4 ring-emerald-500' : ''}`}
+                >
+                  {cell}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Animated Line Overlay when 3-in-a-row is formed */}
+          {result?.line && result.line.length === 3 && (
+            <div
+              className={`absolute bg-emerald-500 shadow-[0_0_15px_#10b981] rounded-full transition-all duration-700 ease-out animate-pulse z-20 pointer-events-none ${getLineClass(
+                result.line
+              )}`}
+            />
+          )}
+
         </div>
 
+        {/* Reset Action */}
         <div className="flex justify-center">
           <button
             onClick={resetGame}
-            className="px-6 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all flex items-center space-x-2"
+            className="px-8 py-3.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-sm border-2 border-black dark:border-white hover:opacity-90 transition-all flex items-center space-x-2 shadow-lg"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Reset Board</span>
+            <span>Reset Tic Tac Toe Board</span>
           </button>
         </div>
 
