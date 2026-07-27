@@ -13,15 +13,15 @@ export const AboutFaqSection: React.FC = () => {
     },
     {
       q: 'How does real-time multiplayer work?',
-      a: 'Our backend utilizes WebSocket technology (Socket.io) to synchronize moves instantly between players with microsecond latency. Room signaling ensures fair play and seamless reconnection.',
+      a: 'Our live game engine connects you instantly with players in real-time so every move happens smoothly without any delay.',
     },
     {
       q: 'How do Coins work in games like Number Predict?',
       a: 'Every registered account starts with 100 bonus coins. In games like Number Predict & Win, entry costs 10 coins for a chance to flip 1 of 100 tiles to win up to 500 bonus coins or cash multipliers!',
     },
     {
-      q: 'Is authentication safe and secure?',
-      a: 'Yes, authentication is powered by Node.js, Express, MongoDB, and JSON Web Tokens (JWT) with salted bcrypt password hashing.',
+      q: 'Is my account safe and secure?',
+      a: 'Yes! Your profile account and coin winnings are completely safe, private, and encrypted.',
     },
   ];
 
@@ -39,7 +39,7 @@ export const AboutFaqSection: React.FC = () => {
               About Baazi Board & FAQs
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mt-2 text-base">
-              Everything you need to know about our real-time multiplayer gaming ecosystem.
+              Everything you need to know about our live gaming platform.
             </p>
           </div>
 
@@ -49,15 +49,15 @@ export const AboutFaqSection: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3">
                 <Zap className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">Instant Sync</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">High speed Socket.io connections for low latency gameplay.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Instant Play</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Smooth, lag-free multiplayer action with instant matching.</p>
             </div>
             <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3">
                 <ShieldCheck className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">JWT Secured</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Protected routes ensure authenticated match histories.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Safe & Secure</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Your progress, wins, and coin balances are always saved.</p>
             </div>
             <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">

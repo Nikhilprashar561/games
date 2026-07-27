@@ -89,7 +89,7 @@ export default function ChessPage() {
             <div className="flex items-center space-x-3 text-xs font-bold">
               <span className="flex items-center space-x-1 text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
                 <Zap className="w-3.5 h-3.5" />
-                <span>Socket Room: #chess-room-1</span>
+                <span>Live Table #1</span>
               </span>
             </div>
           </div>

@@ -31,7 +31,7 @@ export const HeroSection: React.FC = () => {
                 <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white text-xs font-bold px-4 py-2.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60">
                   <span className="flex items-center space-x-1.5 text-emerald-400">
                     <Zap className="w-4 h-4" />
-                    <span>Socket.io Realtime Sync</span>
+                    <span>Live Instant Multiplayer</span>
                   </span>
                   <span className="flex items-center space-x-1.5 text-amber-400">
                     <Trophy className="w-4 h-4" />
@@ -84,7 +84,7 @@ export const HeroSection: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>JWT Auth</span>
+                  <span>100% Safe & Secure</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />

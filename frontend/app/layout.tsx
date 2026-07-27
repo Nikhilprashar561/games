@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -29,7 +29,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-['Outfit',sans-serif]">
+      <body className="font-['Outfit',sans-serif]" suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>
             <div className="min-h-screen flex flex-col bg-white text-slate-900 dark:bg-[#05070b] dark:text-slate-100 transition-colors duration-300">

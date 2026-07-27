@@ -23,20 +23,20 @@ export const Footer: React.FC = () => {
             <span className="text-slate-300 dark:text-slate-700">&bull;</span>
             <span className="flex items-center space-x-1">
               <Shield className="w-3.5 h-3.5 text-emerald-500" />
-              <span>JWT Secured</span>
+              <span>Safe & Secure</span>
             </span>
             <span className="text-slate-300 dark:text-slate-700">&bull;</span>
             <span className="flex items-center space-x-1">
               <Terminal className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Socket.io Engine</span>
+              <span>Instant Multiplayer</span>
             </span>
           </div>
 
           {/* Tagline */}
           <div className="text-xs text-slate-400 flex items-center space-x-1 font-semibold">
-            <span>Built with Next.js &</span>
+            <span>Built with</span>
             <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
-            <span>for Realtime Gaming</span>
+            <span>for Online Gamers</span>
           </div>
 
         </div>

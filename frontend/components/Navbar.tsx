@@ -18,7 +18,7 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between h-20">
           
           {/* Brand New Fancy Text Logo: Pure Dark/White + Subtle Green Accent */}
-          <Link to="/" href="/" className="flex items-center space-x-3 group">
+          <Link href="/" className="flex items-center space-x-3 group">
             <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-950 border border-emerald-500/40 shadow-lg shadow-emerald-500/10 group-hover:border-emerald-400 group-hover:shadow-emerald-500/25 transition-all duration-300">
               <Dices className="w-5 h-5 text-emerald-400 transform group-hover:rotate-180 transition-transform duration-700" />
               <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></div>
@@ -36,7 +36,7 @@ export const Navbar: React.FC = () => {
               </div>
               <span className="text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase -mt-1 flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                <span>Realtime Arena</span>
+                <span>Play & Win Daily</span>
               </span>
             </div>
           </Link>
