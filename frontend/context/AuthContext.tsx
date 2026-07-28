@@ -32,6 +32,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const RAZORPAY_KEY = 'rzp_test_TIpe464KQ9auim';
 
+// Set Axios Base URL for Render Backend API
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://games-zg86.onrender.com';
+axios.defaults.baseURL = API_BASE_URL;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -47,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.body.appendChild(script);
   }, []);
 
-  // Restore Session on Mount (Prevents Reload Logout!)
+  // Restore Session on Mount
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user_session');
@@ -110,7 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         closeAuthModal();
 
-        // Display Welcome Toast Banner for 2.5 seconds
         setWelcomeToast(isNew ? `Welcome to Baazi Board, ${newUser.name}! 🎉` : `Welcome back, ${newUser.name}! 🎉`);
         setTimeout(() => setWelcomeToast(null), 3000);
       }
@@ -303,7 +306,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const rzp = new (window as any).Razorpay(options);
         rzp.open();
       } else {
-        // Fallback for test mode if Razorpay script is blocked
         await updateWalletBalance(amount);
         setWelcomeToast(`Successfully added ₹${amount} to your wallet! 💰`);
         setTimeout(() => setWelcomeToast(null), 3500);
