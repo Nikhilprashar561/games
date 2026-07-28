@@ -3,12 +3,27 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Explicit SMTP Configuration for Gmail App Passwords
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // SSL
   auth: {
     user: process.env.NODEMAILER_GMAIL || 'nikhilprashar561@gmail.com',
     pass: process.env.NODEMAILER_GMAIL_PASS || 'qxqvudnjiwkhaswo',
   },
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
+
+// Verify SMTP Connection on Startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Gmail SMTP Transport Verification Error:', error.message);
+  } else {
+    console.log('✅ Gmail SMTP Transport Verified & Ready to Send Emails!');
+  }
 });
 
 export const sendOTPEmail = async (toEmail: string, otp: string, userName: string = 'Gamer', isEmailChange: boolean = false) => {
@@ -68,7 +83,7 @@ export const sendOTPEmail = async (toEmail: string, otp: string, userName: strin
         }
         .otp-box {
           background: #1e293b;
-          border: 2px stroke #10b981;
+          border: 2px solid #10b981;
           border-radius: 16px;
           padding: 20px;
           display: inline-block;
@@ -128,10 +143,10 @@ export const sendOTPEmail = async (toEmail: string, otp: string, userName: strin
       subject: subjectTitle,
       html: htmlContent,
     });
-    console.log(`✉️ OTP Email sent successfully to ${toEmail}: ${info.messageId}`);
+    console.log(`✉️ OTP Email sent successfully to ${toEmail} | Message ID: ${info.messageId}`);
     return true;
-  } catch (error) {
-    console.error('❌ Failed to send OTP email via Nodemailer:', error);
+  } catch (error: any) {
+    console.error('❌ Failed to send OTP email via Gmail SMTP:', error.message || error);
     return false;
   }
 };

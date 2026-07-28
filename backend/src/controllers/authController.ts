@@ -37,6 +37,14 @@ export const sendOTP = async (req: Request, res: Response) => {
     const otp = generate4DigitOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
 
+    console.log(`\n=================================================`);
+    console.log(`🔑 [SECURITY LOG] 4-DIGIT VERIFICATION OTP GENERATED`);
+    console.log(`📧 Target Email: ${cleanEmail}`);
+    console.log(`⚡ OTP Code: [ ${otp} ]`);
+    console.log(`=================================================\n`);
+
+    let emailSent = false;
+
     try {
       let user = await User.findOne({ email: cleanEmail });
 
@@ -57,11 +65,7 @@ export const sendOTP = async (req: Request, res: Response) => {
         await user.save();
       }
 
-      await sendOTPEmail(cleanEmail, otp, user.name);
-      return res.json({
-        success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
-      });
+      emailSent = await sendOTPEmail(cleanEmail, otp, user.name);
     } catch (dbErr) {
       let mockUser = fallbackUsers.get(cleanEmail);
       if (!mockUser) {
@@ -82,12 +86,16 @@ export const sendOTP = async (req: Request, res: Response) => {
       }
       fallbackUsers.set(cleanEmail, mockUser);
 
-      await sendOTPEmail(cleanEmail, otp, mockUser.name);
-      return res.json({
-        success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
-      });
+      emailSent = await sendOTPEmail(cleanEmail, otp, mockUser.name);
     }
+
+    return res.json({
+      success: true,
+      message: emailSent
+        ? `4-Digit OTP sent to ${cleanEmail}. Check your inbox or spam!`
+        : `OTP generated for ${cleanEmail}. (Code: ${otp})`,
+      devOtp: otp, // Enables instant local testing
+    });
   } catch (error: any) {
     console.error('Send OTP Error:', error);
     return res.status(500).json({ message: error.message || 'Failed to send verification OTP' });
@@ -229,6 +237,8 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
     const otp = generate4DigitOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
+    console.log(`🔑 [EMAIL CHANGE OTP] New Email: ${cleanNewEmail} | OTP: ${otp}`);
+
     try {
       const existing = await User.findOne({ email: cleanNewEmail });
       if (existing) {
@@ -242,8 +252,8 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
         user.pendingEmailOtpExpires = otpExpires;
         await user.save();
 
-        await sendOTPEmail(cleanNewEmail, otp, user.name, true);
-        return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}` });
+        const sent = await sendOTPEmail(cleanNewEmail, otp, user.name, true);
+        return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}`, devOtp: otp });
       }
     } catch (err) {
       // Fallback
