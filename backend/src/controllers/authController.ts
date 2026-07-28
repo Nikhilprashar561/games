@@ -22,7 +22,7 @@ const generate4DigitOTP = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// @desc    Send 4-Digit OTP to Email (Guaranteed Delivery)
+// @desc    Send 4-Digit OTP to Email (Cloud Compatible & Bulletproof Error Handling)
 // @route   POST /api/auth/send-otp
 export const sendOTP = async (req: Request, res: Response) => {
   try {
@@ -60,11 +60,13 @@ export const sendOTP = async (req: Request, res: Response) => {
         userObjName = user.name;
       }
 
-      // Guaranteed Email Delivery (Awaited to ensure Gmail SMTP confirms delivery)
-      const emailSent = await sendOTPEmail(cleanEmail, otp, userObjName);
+      // Guaranteed Email Delivery Check
+      const emailResult = await sendOTPEmail(cleanEmail, otp, userObjName);
 
-      if (!emailSent) {
-        return res.status(500).json({ message: 'Could not deliver OTP email. Please check your email address!' });
+      if (!emailResult.success) {
+        return res.status(500).json({
+          message: `Failed to deliver OTP email: ${emailResult.error || 'SMTP delivery error'}`,
+        });
       }
 
       return res.json({
@@ -91,11 +93,13 @@ export const sendOTP = async (req: Request, res: Response) => {
       }
       fallbackUsers.set(cleanEmail, mockUser);
 
-      // Guaranteed Email Delivery
-      const emailSent = await sendOTPEmail(cleanEmail, otp, mockUser.name);
+      // Guaranteed Email Delivery Check
+      const emailResult = await sendOTPEmail(cleanEmail, otp, mockUser.name);
 
-      if (!emailSent) {
-        return res.status(500).json({ message: 'Could not deliver OTP email. Please check your email address!' });
+      if (!emailResult.success) {
+        return res.status(500).json({
+          message: `Failed to deliver OTP email: ${emailResult.error || 'SMTP delivery error'}`,
+        });
       }
 
       return res.json({
@@ -257,9 +261,9 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
         user.pendingEmailOtpExpires = otpExpires;
         await user.save();
 
-        const emailSent = await sendOTPEmail(cleanNewEmail, otp, user.name, true);
-        if (!emailSent) {
-          return res.status(500).json({ message: 'Could not send verification OTP to new email' });
+        const emailResult = await sendOTPEmail(cleanNewEmail, otp, user.name, true);
+        if (!emailResult.success) {
+          return res.status(500).json({ message: `Could not send verification OTP to new email: ${emailResult.error}` });
         }
 
         return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}` });

@@ -3,16 +3,26 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Direct Gmail Transport for 100% Guaranteed Delivery
+// Standard Cloud-Compatible Gmail SMTP Transport (Port 587 TLS)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // TLS STARTTLS for cloud compatibility (Render, Vercel, AWS)
   auth: {
     user: process.env.NODEMAILER_GMAIL || 'nikhilprashar561@gmail.com',
     pass: process.env.NODEMAILER_GMAIL_PASS || 'qxqvudnjiwkhaswo',
   },
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
 
-export const sendOTPEmail = async (toEmail: string, otp: string, userName: string = 'Gamer', isEmailChange: boolean = false) => {
+export const sendOTPEmail = async (
+  toEmail: string,
+  otp: string,
+  userName: string = 'Gamer',
+  isEmailChange: boolean = false
+): Promise<{ success: boolean; error?: string }> => {
   const subjectTitle = isEmailChange
     ? `🎮 Baazi Board Email Update OTP: ${otp}`
     : `🎮 Your Baazi Board Login OTP: ${otp} - Enter the Arena!`;
@@ -123,16 +133,17 @@ export const sendOTPEmail = async (toEmail: string, otp: string, userName: strin
   `;
 
   try {
+    const senderEmail = process.env.NODEMAILER_GMAIL || 'nikhilprashar561@gmail.com';
     const info = await transporter.sendMail({
-      from: `"Baazi Board Arena" <${process.env.NODEMAILER_GMAIL || 'nikhilprashar561@gmail.com'}>`,
+      from: `"Baazi Board Arena" <${senderEmail}>`,
       to: toEmail,
       subject: subjectTitle,
       html: htmlContent,
     });
     console.log(`✉️ OTP Email sent successfully to ${toEmail}: ${info.messageId}`);
-    return true;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error('❌ Failed to send OTP email via Nodemailer:', error);
-    return false;
+    return { success: false, error: error.message || 'SMTP error' };
   }
 };
