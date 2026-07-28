@@ -5,6 +5,7 @@ export interface User {
   walletBalance: number; // Real Money Balance in ₹ Rupees
   upiId: string;
   avatar: string;
+  isVerified?: boolean;
 }
 
 export interface GameInfo {

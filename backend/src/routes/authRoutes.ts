@@ -1,12 +1,31 @@
 import express from 'express';
-import { signup, login, getMe, updateCoins } from '../controllers/authController';
+import {
+  signup,
+  login,
+  sendOTP,
+  verifyOTP,
+  getMe,
+  updateCoins,
+  updateName,
+  requestEmailChange,
+  verifyEmailChange,
+} from '../controllers/authController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
 router.post('/signup', signup);
 router.post('/login', login);
+
+// OTP Authentication Routes
+router.post('/send-otp', sendOTP);
+router.post('/verify-otp', verifyOTP);
+
+// Protected Profile & OTP Management Routes
 router.get('/me', protect, getMe);
 router.post('/update-coins', protect, updateCoins);
+router.post('/update-name', protect, updateName);
+router.post('/request-email-change', protect, requestEmailChange);
+router.post('/verify-email-change', protect, verifyEmailChange);
 
 export default router;

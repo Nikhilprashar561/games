@@ -6,6 +6,12 @@ export interface IUser extends Document {
   walletBalance: number; // Real Money Balance in ₹ Rupees
   upiId: string;
   avatar: string;
+  isVerified: boolean;
+  otp?: string;
+  otpExpires?: Date;
+  pendingEmail?: string;
+  pendingEmailOtp?: string;
+  pendingEmailOtpExpires?: Date;
   createdAt: Date;
 }
 
@@ -33,6 +39,30 @@ const UserSchema: Schema = new Schema({
   avatar: {
     type: String,
     default: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Gamer',
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  otp: {
+    type: String,
+    default: null,
+  },
+  otpExpires: {
+    type: Date,
+    default: null,
+  },
+  pendingEmail: {
+    type: String,
+    default: null,
+  },
+  pendingEmailOtp: {
+    type: String,
+    default: null,
+  },
+  pendingEmailOtpExpires: {
+    type: Date,
+    default: null,
   },
   createdAt: {
     type: Date,

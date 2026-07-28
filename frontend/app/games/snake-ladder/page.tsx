@@ -8,7 +8,7 @@ import { ArrowLeft, RotateCcw, ShieldCheck, Trophy, Wallet, Clock, Volume2, Volu
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 
-// Snakes & Ladders Map (Industry Standard 100-cell Boustrophedon Board)
+// Snakes & Ladders Map (100-cell Boustrophedon Board)
 const LADDERS_MAP: Record<number, number> = {
   4: 14,
   9: 31,
@@ -33,9 +33,6 @@ const SNAKES_MAP: Record<number, number> = {
 };
 
 // 100-cell Boustrophedon Grid Coordinates [row (1..10), col (1..10)]
-// Row 1 (Bottom, cells 1..10): Left -> Right
-// Row 2 (cells 11..20): Right -> Left
-// Row 3 (cells 21..30): Left -> Right ... Boustrophedon Flow!
 const getCellCoords = (cellNum: number): [number, number] => {
   if (cellNum < 1 || cellNum > 100) return [10, 1];
   const rowFromBottom = Math.floor((cellNum - 1) / 10);
@@ -89,27 +86,27 @@ export default function SnakeLadderPage() {
         osc.stop(ctx.currentTime + 0.3);
       } else if (type === 'step') {
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
         osc.start();
-        osc.stop(ctx.currentTime + 0.1);
+        osc.stop(ctx.currentTime + 0.12);
       } else if (type === 'ladder') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(300, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(700, ctx.currentTime + 0.4);
+        osc.frequency.linearRampToValueAtTime(750, ctx.currentTime + 0.45);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
         osc.start();
-        osc.stop(ctx.currentTime + 0.4);
+        osc.stop(ctx.currentTime + 0.45);
       } else if (type === 'snake') {
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(600, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.5);
+        osc.frequency.setValueAtTime(650, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(180, ctx.currentTime + 0.55);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.55);
         osc.start();
-        osc.stop(ctx.currentTime + 0.5);
+        osc.stop(ctx.currentTime + 0.55);
       } else if (type === 'win') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
@@ -173,7 +170,7 @@ export default function SnakeLadderPage() {
     }, 100);
   };
 
-  // Step-by-Step Boustrophedon Movement Flow
+  // Parabolic Hop Movement Flow (300ms step latency)
   const processOpponentStep = (roll: number) => {
     const startCell = opponentPos;
     const targetCell = startCell + roll;
@@ -250,7 +247,7 @@ export default function SnakeLadderPage() {
     }, 100);
   };
 
-  // Step-by-Step Boustrophedon Movement Flow
+  // Parabolic Hop Movement Flow (300ms step latency)
   const processPlayerStep = (roll: number) => {
     const startCell = playerPos;
     const targetCell = startCell + roll;
@@ -346,7 +343,7 @@ export default function SnakeLadderPage() {
     );
   };
 
-  // Industry Standard Sleek Wooden Ladder (Dark rails + Golden rungs)
+  // REALISTIC 3D WOODEN LADDER ENGINE (Depth Gradient Rails + Metallic Brackets + Textured Rungs)
   const renderSVGLadder = (startCell: number, endCell: number, key: string) => {
     const [r1, c1] = getCellCoords(startCell);
     const [r2, c2] = getCellCoords(endCell);
@@ -367,16 +364,33 @@ export default function SnakeLadderPage() {
 
     return (
       <g key={key}>
-        <line x1={x1 - 1.2} y1={y1} x2={x2 - 1.2} y2={y2} stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
-        <line x1={x1 + 1.2} y1={y1} x2={x2 + 1.2} y2={y2} stroke="#1e293b" strokeWidth="2.2" strokeLinecap="round" />
+        {/* 3D Drop Shadow */}
+        <line x1={x1 - 1.2} y1={y1 + 1.2} x2={x2 - 1.2} y2={y2 + 1.2} stroke="rgba(0,0,0,0.4)" strokeWidth="3" strokeLinecap="round" />
+        <line x1={x1 + 1.2} y1={y1 + 1.2} x2={x2 + 1.2} y2={y2 + 1.2} stroke="rgba(0,0,0,0.4)" strokeWidth="3" strokeLinecap="round" />
+        
+        {/* 3D Wooden Rails with Gradient Tone */}
+        <line x1={x1 - 1.4} y1={y1} x2={x2 - 1.4} y2={y2} stroke="#5c2c06" strokeWidth="2.8" strokeLinecap="round" />
+        <line x1={x1 - 1.0} y1={y1} x2={x2 - 1.0} y2={y2} stroke="#a75d1d" strokeWidth="1.6" strokeLinecap="round" />
+
+        <line x1={x1 + 1.0} y1={y1} x2={x2 + 1.0} y2={y2} stroke="#5c2c06" strokeWidth="2.8" strokeLinecap="round" />
+        <line x1={x1 + 1.4} y1={y1} x2={x2 + 1.4} y2={y2} stroke="#a75d1d" strokeWidth="1.6" strokeLinecap="round" />
+
+        {/* 3D Wood Rungs with Metallic Bracket Rivets */}
         {rungs.map((r, idx) => (
-          <line key={idx} x1={r.rx - 2.2} y1={r.ry} x2={r.rx + 2.2} y2={r.ry} stroke="#f59e0b" strokeWidth="1.8" strokeLinecap="round" />
+          <g key={idx}>
+            <line x1={r.rx - 2.4} y1={r.ry + 0.3} x2={r.rx + 2.4} y2={r.ry + 0.3} stroke="rgba(0,0,0,0.3)" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1={r.rx - 2.4} y1={r.ry} x2={r.rx + 2.4} y2={r.ry} stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1={r.rx - 2.4} y1={r.ry - 0.3} x2={r.rx + 2.4} y2={r.ry - 0.3} stroke="#fbbf24" strokeWidth="1" strokeLinecap="round" />
+            {/* Metallic Rivets */}
+            <circle cx={r.rx - 1.4} cy={r.ry} r="0.4" fill="#334155" />
+            <circle cx={r.rx + 1.4} cy={r.ry} r="0.4" fill="#334155" />
+          </g>
         ))}
       </g>
     );
   };
 
-  // Industry Standard Snake (Tapered emerald cobra with yellow belly stripes & cobra head)
+  // REALISTIC 3D COBRA SNAKE ENGINE (Tapered Coiled Body + Coral Python Scales + Cobra Hood & Tongue!)
   const renderSVGSnake = (headCell: number, tailCell: number, key: string) => {
     const [r1, c1] = getCellCoords(headCell);
     const [r2, c2] = getCellCoords(tailCell);
@@ -386,60 +400,85 @@ export default function SnakeLadderPage() {
     const x2 = (c2 - 0.5) * 10;
     const y2 = (r2 - 0.5) * 10;
 
-    const midX = (x1 + x2) / 2 + (c1 > c2 ? 10 : -10);
+    const midX = (x1 + x2) / 2 + (c1 > c2 ? 11 : -11);
     const midY = (y1 + y2) / 2;
 
     const pathD = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
 
     return (
       <g key={key}>
-        <path d={pathD} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="4" strokeLinecap="round" transform="translate(0.4, 0.6)" />
-        <path d={pathD} fill="none" stroke="#065f46" strokeWidth="3" strokeLinecap="round" />
-        <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.2" strokeLinecap="round" />
-        <path d={pathD} fill="none" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="2 2" />
-        <circle cx={x1} cy={y1} r="2.2" fill="#ef4444" stroke="#ffffff" strokeWidth="0.5" />
-        <circle cx={x1 - 0.5} cy={y1 - 0.4} r="0.5" fill="#ffffff" />
-        <circle cx={x1 - 0.5} cy={y1 - 0.4} r="0.25" fill="#000000" />
+        {/* Real 3D Drop Shadow */}
+        <path d={pathD} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="5" strokeLinecap="round" transform="translate(0.8, 1)" />
+        
+        {/* Tapered Outer Dark Emerald Python Spine */}
+        <path d={pathD} fill="none" stroke="#064e3b" strokeWidth="4.2" strokeLinecap="round" />
+        
+        {/* Vibrant Emerald Main Body */}
+        <path d={pathD} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+        
+        {/* Diamond Python Skin Pattern */}
+        <path d={pathD} fill="none" stroke="#fbbf24" strokeWidth="1.6" strokeLinecap="round" strokeDasharray="2.5 2.5" />
+        <path d={pathD} fill="none" stroke="#34d399" strokeWidth="0.8" strokeLinecap="round" strokeDasharray="1 3" />
+
+        {/* Realistic Cobra Hood & Head */}
+        <g transform={`translate(${x1}, ${y1})`}>
+          {/* Red Flicking Tongue */}
+          <path d="M 0 0 L -0.5 -2.5 M 0 0 L 0.5 -2.5" stroke="#ef4444" strokeWidth="0.6" fill="none" />
+          
+          {/* Cobra Head Oval */}
+          <ellipse cx="0" cy="0" rx="2.5" ry="2.8" fill="#047857" stroke="#ffffff" strokeWidth="0.6" />
+          <ellipse cx="0" cy="0" rx="1.8" ry="2.0" fill="#065f46" />
+          
+          {/* Eyes with Slit Pupils */}
+          <circle cx="-1.0" cy="-0.8" r="0.6" fill="#fbbf24" />
+          <circle cx="-1.0" cy="-0.8" r="0.3" fill="#000000" />
+
+          <circle cx="1.0" cy="-0.8" r="0.6" fill="#fbbf24" />
+          <circle cx="1.0" cy="-0.8" r="0.3" fill="#000000" />
+        </g>
       </g>
     );
   };
 
-  // Top Overlay Pin Marker Positioned Centered Above Each Tile Box
-  const renderTopOverlayPinMarker = (cellNum: number, color: 'red' | 'blue', name: string, isTraveling: boolean) => {
+  // REALISTIC 3D PHYSICAL GAME PAWN PIECE (Sphere Head + Neck Ring + Weighted Base + Aura Ring!)
+  const renderTopOverlay3DPawn = (cellNum: number, color: 'red' | 'blue', name: string, isTraveling: boolean) => {
     const [row, col] = getCellCoords(cellNum);
-    const pinHex = color === 'red' ? '#e11d48' : '#0ea5e9';
 
     const leftPercent = (col - 0.5) * 10;
     const topPercent = (row - 0.5) * 10;
 
+    const baseBg = color === 'red' ? 'from-rose-500 via-rose-600 to-rose-900 border-rose-300' : 'from-sky-400 via-sky-500 to-sky-800 border-sky-200';
+    const badgeColor = color === 'red' ? 'border-rose-400 text-rose-300' : 'border-sky-400 text-sky-300';
+
     return (
       <div
-        key={`marker-${color}`}
+        key={`pawn-${color}`}
         className={`absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-50 ${
-          isTraveling ? 'scale-125 -translate-y-4 animate-bounce' : ''
+          isTraveling ? 'scale-125 -translate-y-7 animate-bounce' : ''
         }`}
         style={{ left: `${leftPercent}%`, top: `${topPercent}%` }}
       >
         {/* Floating Tooltip Name Badge */}
-        <div className="mb-0.5 px-2 py-0.5 rounded-full bg-slate-950/90 text-white font-black text-[9px] whitespace-nowrap border border-amber-400 shadow-xl">
+        <div className={`mb-1 px-2.5 py-0.5 rounded-full bg-slate-950/95 font-black text-[9px] sm:text-[10px] whitespace-nowrap border-2 shadow-[0_10px_25px_rgba(0,0,0,0.9)] ${badgeColor}`}>
           {name}
         </div>
 
-        {/* Location Pin Marker */}
-        <svg
-          viewBox="0 0 24 28"
-          className="w-7 h-8 sm:w-8 sm:h-9 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 28 12 28C12 28 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
-            fill={pinHex}
-            stroke="#ffffff"
-            strokeWidth="1.8"
-          />
-          <circle cx="12" cy="11" r="5" fill="#ffffff" />
-        </svg>
+        {/* 3D Physical Game Pawn Piece */}
+        <div className="relative flex flex-col items-center group">
+          {/* Active Turn Pulsing Aura Ring */}
+          <div className={`absolute -inset-1 rounded-full blur-sm animate-pulse ${color === 'red' ? 'bg-rose-500/50' : 'bg-sky-400/50'}`}></div>
+
+          {/* 3D Pawn Sphere Head */}
+          <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br ${baseBg} border-2 shadow-2xl relative flex items-center justify-center z-20`}>
+            <div className="w-1.5 h-1.5 rounded-full bg-white/80 absolute top-1 left-1"></div>
+          </div>
+
+          {/* 3D Pawn Neck Ring */}
+          <div className="w-3.5 h-1 bg-slate-900 border-x border-white/40 -mt-0.5 z-10"></div>
+
+          {/* 3D Pawn Pedestal Base */}
+          <div className={`w-6 h-3 sm:w-7 sm:h-3.5 rounded-b-xl bg-gradient-to-b ${baseBg} border-t-2 border-white/60 shadow-[0_8px_16px_rgba(0,0,0,0.8)] -mt-0.5 z-0`}></div>
+        </div>
       </div>
     );
   };
@@ -468,7 +507,7 @@ export default function SnakeLadderPage() {
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Boustrophedon Flow & Industry Standard Board</span>
+                <span>3D Physical Pawns & Cobra Snakes Engine</span>
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                 Snake & Ladder Supreme
@@ -521,7 +560,7 @@ export default function SnakeLadderPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* RESTORED PREVIOUS BOARD SIZE (w-[320px] h-[320px] sm:w-[460px] sm:h-[460px]) */}
+              {/* 100-Tile Board Canvas */}
               <div className="lg:col-span-8 flex flex-col items-center">
                 <div className="relative w-[320px] h-[320px] sm:w-[460px] sm:h-[460px] border-4 border-slate-900 rounded-3xl shadow-2xl bg-slate-950 select-none">
                   
@@ -555,21 +594,21 @@ export default function SnakeLadderPage() {
 
                   {/* LAYER 2: VISUAL SVG OVERLAY CANVAS FOR SNAKES & LADDERS (z-10) */}
                   <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full z-10 pointer-events-none">
-                    {/* Render Industry Standard Wooden Ladders */}
+                    {/* Render 3D Textured Wooden Ladders */}
                     {Object.entries(LADDERS_MAP).map(([start, end]) =>
                       renderSVGLadder(Number(start), Number(end), `ladder-${start}`)
                     )}
 
-                    {/* Render Industry Standard Cobra Snakes */}
+                    {/* Render Realistic Cobra Python Snakes */}
                     {Object.entries(SNAKES_MAP).map(([head, tail]) =>
                       renderSVGSnake(Number(head), Number(tail), `snake-${head}`)
                     )}
                   </svg>
 
-                  {/* LAYER 3: TOP-LEVEL PIN MARKERS POSITIONED CENTERED ABOVE TILES (z-50) */}
+                  {/* LAYER 3: TOP-LEVEL 3D PHYSICAL GAME PAWNS (z-50 -> ALWAYS ON TOP!) */}
                   <div className="absolute inset-0 w-full h-full pointer-events-none z-50">
-                    {renderTopOverlayPinMarker(playerPos, 'red', user?.name || 'You', travelingPlayer === 'player')}
-                    {renderTopOverlayPinMarker(opponentPos, 'blue', opponentName, travelingPlayer === 'opponent')}
+                    {renderTopOverlay3DPawn(playerPos, 'red', user?.name || 'You', travelingPlayer === 'player')}
+                    {renderTopOverlay3DPawn(opponentPos, 'blue', opponentName, travelingPlayer === 'opponent')}
                   </div>
 
                 </div>

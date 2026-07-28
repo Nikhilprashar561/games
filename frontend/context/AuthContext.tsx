@@ -12,10 +12,15 @@ interface AuthContextType {
   welcomeToast: string | null;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  sendOTP: (email: string) => Promise<boolean>;
+  verifyOTP: (email: string, otp: string) => Promise<void>;
   login: (email: string) => Promise<void>;
   signup: (name: string, email: string) => Promise<void>;
   logout: () => void;
   updateWalletBalance: (delta: number) => Promise<number>;
+  updateName: (name: string) => Promise<void>;
+  requestEmailChange: (newEmail: string) => Promise<boolean>;
+  verifyEmailChange: (newEmail: string, otp: string) => Promise<void>;
   recordGameMatch: (
     gameSlug: string,
     gameTitle: string,
@@ -32,7 +37,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const RAZORPAY_KEY = 'rzp_test_TIpe464KQ9auim';
 
-// Set Axios Base URL for Render Backend API
+// Set Axios Base URL for Backend API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://games-zg86.onrender.com';
 axios.defaults.baseURL = API_BASE_URL;
 
@@ -97,14 +102,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
-  // Login with Email + Welcome Toast
-  const login = async (email: string) => {
+  // Send 4-Digit OTP to Email
+  const sendOTP = async (email: string): Promise<boolean> => {
     try {
-      const res = await axios.post('/api/auth/login', { email });
+      const res = await axios.post('/api/auth/send-otp', { email });
+      return res.data.success;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to send OTP to email');
+    }
+  };
+
+  // Verify 4-Digit OTP & Login
+  const verifyOTP = async (email: string, otp: string) => {
+    try {
+      const res = await axios.post('/api/auth/verify-otp', { email, otp });
       if (res.data.success) {
         const newToken = res.data.token;
         const newUser = res.data.user;
-        const isNew = res.data.isNewUser;
 
         localStorage.setItem('token', newToken);
         localStorage.setItem('user_session', JSON.stringify(newUser));
@@ -114,34 +128,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         closeAuthModal();
 
-        setWelcomeToast(isNew ? `Welcome to Baazi Board, ${newUser.name}! 🎉` : `Welcome back, ${newUser.name}! 🎉`);
+        setWelcomeToast(`Welcome to Baazi Board Arena, ${newUser.name}! 🎉`);
         setTimeout(() => setWelcomeToast(null), 3000);
       }
-    } catch (error: any) {
-      const displayName = email.split('@')[0] || 'Player';
-      const newUser: User = {
-        id: 'usr_' + Date.now(),
-        name: displayName,
-        email,
-        walletBalance: 500,
-        upiId: `${displayName}@paytm`,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
-      };
-      const mockToken = 'mock_jwt_token_' + Date.now();
-      localStorage.setItem('token', mockToken);
-      localStorage.setItem('user_session', JSON.stringify(newUser));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${mockToken}`;
-      setToken(mockToken);
-      setUser(newUser);
-      closeAuthModal();
-
-      setWelcomeToast(`Welcome back, ${newUser.name}! 🎉`);
-      setTimeout(() => setWelcomeToast(null), 3000);
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Invalid 4-digit OTP. Please try again!');
     }
   };
 
+  const login = async (email: string) => {
+    await sendOTP(email);
+  };
+
   const signup = async (_name: string, email: string) => {
-    return login(email);
+    await sendOTP(email);
   };
 
   const logout = () => {
@@ -167,6 +167,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     return newBal;
+  };
+
+  const updateName = async (newName: string) => {
+    if (!user) return;
+    try {
+      const res = await axios.post('/api/auth/update-name', { name: newName });
+      if (res.data.success) {
+        const updated = { ...user, name: newName };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+        setWelcomeToast(`Display name updated to ${newName}! ✨`);
+        setTimeout(() => setWelcomeToast(null), 3000);
+      }
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to update display name');
+    }
+  };
+
+  const requestEmailChange = async (newEmail: string): Promise<boolean> => {
+    try {
+      const res = await axios.post('/api/auth/request-email-change', { newEmail });
+      return res.data.success;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to send OTP to new email');
+    }
+  };
+
+  const verifyEmailChange = async (newEmail: string, otp: string) => {
+    try {
+      const res = await axios.post('/api/auth/verify-email-change', { newEmail, otp });
+      if (res.data.success) {
+        const newToken = res.data.token;
+        const newUser = res.data.user;
+
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user_session', JSON.stringify(newUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+        setToken(newToken);
+        setUser(newUser);
+        setWelcomeToast(`Email updated to ${newEmail}! ✉️`);
+        setTimeout(() => setWelcomeToast(null), 3000);
+      }
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Invalid email verification OTP');
+    }
   };
 
   const recordGameMatch = async (
@@ -327,10 +373,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         welcomeToast,
         openAuthModal,
         closeAuthModal,
+        sendOTP,
+        verifyOTP,
         login,
         signup,
         logout,
         updateWalletBalance,
+        updateName,
+        requestEmailChange,
+        verifyEmailChange,
         recordGameMatch,
         fetchMatchHistory,
         openRazorpayCheckout,
