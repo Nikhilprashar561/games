@@ -22,7 +22,7 @@ const generate4DigitOTP = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// @desc    Send 4-Digit OTP to Email
+// @desc    Send 4-Digit OTP to Email (High-Speed Non-Blocking Dispatch)
 // @route   POST /api/auth/send-otp
 export const sendOTP = async (req: Request, res: Response) => {
   try {
@@ -36,6 +36,8 @@ export const sendOTP = async (req: Request, res: Response) => {
     const displayName = cleanEmail.split('@')[0];
     const otp = generate4DigitOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    let userObjName = displayName;
 
     try {
       let user = await User.findOne({ email: cleanEmail });
@@ -55,9 +57,12 @@ export const sendOTP = async (req: Request, res: Response) => {
         user.otp = otp;
         user.otpExpires = otpExpires;
         await user.save();
+        userObjName = user.name;
       }
 
-      await sendOTPEmail(cleanEmail, otp, user.name);
+      // Fast Asynchronous Email Dispatch (non-blocking for sub-100ms API response!)
+      sendOTPEmail(cleanEmail, otp, userObjName).catch((err) => console.error('Background Email Dispatch Error:', err));
+
       return res.json({
         success: true,
         message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
@@ -82,7 +87,9 @@ export const sendOTP = async (req: Request, res: Response) => {
       }
       fallbackUsers.set(cleanEmail, mockUser);
 
-      await sendOTPEmail(cleanEmail, otp, mockUser.name);
+      // Fast Asynchronous Email Dispatch
+      sendOTPEmail(cleanEmail, otp, mockUser.name).catch((err) => console.error('Background Email Dispatch Error:', err));
+
       return res.json({
         success: true,
         message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
@@ -242,7 +249,7 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
         user.pendingEmailOtpExpires = otpExpires;
         await user.save();
 
-        await sendOTPEmail(cleanNewEmail, otp, user.name, true);
+        sendOTPEmail(cleanNewEmail, otp, user.name, true).catch((err) => console.error('Background Email Dispatch Error:', err));
         return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}` });
       }
     } catch (err) {

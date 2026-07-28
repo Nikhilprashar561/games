@@ -3,8 +3,18 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// High-Speed Pooled Connection Transport for Gmail SMTP
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  pool: true, // Enable TCP Connection Pooling for Instant Email Delivery!
+  maxConnections: 5,
+  maxMessages: 100,
+  connectionTimeout: 5000, // Fast 5s timeouts
+  greetingTimeout: 5000,
+  socketTimeout: 5000,
   auth: {
     user: process.env.NODEMAILER_GMAIL || 'nikhilprashar561@gmail.com',
     pass: process.env.NODEMAILER_GMAIL_PASS || 'qxqvudnjiwkhaswo',
