@@ -22,7 +22,7 @@ const generate4DigitOTP = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// @desc    Send 4-Digit OTP to Email (High-Speed Non-Blocking Dispatch)
+// @desc    Send 4-Digit OTP to Email (Guaranteed Delivery)
 // @route   POST /api/auth/send-otp
 export const sendOTP = async (req: Request, res: Response) => {
   try {
@@ -60,8 +60,12 @@ export const sendOTP = async (req: Request, res: Response) => {
         userObjName = user.name;
       }
 
-      // Fast Asynchronous Email Dispatch (non-blocking for sub-100ms API response!)
-      sendOTPEmail(cleanEmail, otp, userObjName).catch((err) => console.error('Background Email Dispatch Error:', err));
+      // Guaranteed Email Delivery (Awaited to ensure Gmail SMTP confirms delivery)
+      const emailSent = await sendOTPEmail(cleanEmail, otp, userObjName);
+
+      if (!emailSent) {
+        return res.status(500).json({ message: 'Could not deliver OTP email. Please check your email address!' });
+      }
 
       return res.json({
         success: true,
@@ -87,8 +91,12 @@ export const sendOTP = async (req: Request, res: Response) => {
       }
       fallbackUsers.set(cleanEmail, mockUser);
 
-      // Fast Asynchronous Email Dispatch
-      sendOTPEmail(cleanEmail, otp, mockUser.name).catch((err) => console.error('Background Email Dispatch Error:', err));
+      // Guaranteed Email Delivery
+      const emailSent = await sendOTPEmail(cleanEmail, otp, mockUser.name);
+
+      if (!emailSent) {
+        return res.status(500).json({ message: 'Could not deliver OTP email. Please check your email address!' });
+      }
 
       return res.json({
         success: true,
@@ -249,7 +257,11 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
         user.pendingEmailOtpExpires = otpExpires;
         await user.save();
 
-        sendOTPEmail(cleanNewEmail, otp, user.name, true).catch((err) => console.error('Background Email Dispatch Error:', err));
+        const emailSent = await sendOTPEmail(cleanNewEmail, otp, user.name, true);
+        if (!emailSent) {
+          return res.status(500).json({ message: 'Could not send verification OTP to new email' });
+        }
+
         return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}` });
       }
     } catch (err) {
