@@ -4,62 +4,100 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, Coins, ShieldCheck, Sparkles, Trophy, Eye, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Trophy, Wallet, RotateCcw, Spade, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getRandomOpponentName } from '../../../utils/realPlayers';
 
 interface Card {
   suit: '♠' | '♥' | '♦' | '♣';
   value: string;
-  color: string;
+  num: number;
 }
 
-const CARDS_DECK: Card[] = [
-  { suit: '♠', value: 'A', color: 'text-slate-900 dark:text-white' },
-  { suit: '♥', value: 'K', color: 'text-rose-500' },
-  { suit: '♦', value: 'Q', color: 'text-rose-500' },
-  { suit: '♣', value: 'J', color: 'text-slate-900 dark:text-white' },
-  { suit: '♠', value: '10', color: 'text-slate-900 dark:text-white' },
-  { suit: '♥', value: 'A', color: 'text-rose-500' },
-  { suit: '♦', value: 'A', color: 'text-rose-500' },
-  { suit: '♣', value: 'K', color: 'text-slate-900 dark:text-white' },
-];
+const SUITS: ('♠' | '♥' | '♦' | '♣')[] = ['♠', '♥', '♦', '♣'];
+const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 export default function TeenPattiPage() {
-  const { user, updateUserCoins } = useAuth();
-  const [pot, setPot] = useState<number>(40);
-  const [bet] = useState<number>(10);
-  const [playerCards, setPlayerCards] = useState<Card[]>([
-    { suit: '♠', value: 'A', color: 'text-slate-900 dark:text-white' },
-    { suit: '♥', value: 'A', color: 'text-rose-500' },
-    { suit: '♦', value: 'K', color: 'text-rose-500' },
-  ]);
-  const [isRevealed, setIsRevealed] = useState<boolean>(false);
-  const [roundResult, setRoundResult] = useState<string | null>(null);
+  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const ENTRY_COST = 50;
+  const WIN_REWARD = 95;
 
-  const placeBet = async () => {
-    if (!user || user.coins < bet) return;
-    await updateUserCoins(-bet);
-    setPot((prev) => prev + bet * 2);
-  };
+  const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
+  const [playerCards, setPlayerCards] = useState<Card[]>([]);
+  const [opponentCards, setOpponentCards] = useState<Card[]>([]);
+  const [opponentName, setOpponentName] = useState<string>('Priya_Gamer');
+  const [isOpponentThinking, setIsOpponentThinking] = useState<boolean>(false);
+  const [showCards, setShowCards] = useState<boolean>(false);
+  const [betType, setBetType] = useState<'blind' | 'chaal'>('blind');
+  const [potAmount, setPotAmount] = useState<number>(100);
+  const [winner, setWinner] = useState<string | null>(null);
 
-  const showDown = async () => {
-    setIsRevealed(true);
-    const win = Math.random() > 0.4;
-    if (win) {
-      setRoundResult('YOU WIN THE POT!');
-      await updateUserCoins(pot);
-      confetti({ particleCount: 90, spread: 60 });
-    } else {
-      setRoundResult('OPPONENT HAS A FLUSH! YOU LOST.');
+  const drawHand = (): Card[] => {
+    const hand: Card[] = [];
+    for (let i = 0; i < 3; i++) {
+      const suit = SUITS[Math.floor(Math.random() * SUITS.length)];
+      const valIdx = Math.floor(Math.random() * VALUES.length);
+      hand.push({ suit, value: VALUES[valIdx], num: valIdx + 2 });
     }
+    return hand;
   };
 
-  const nextHand = () => {
-    setIsRevealed(false);
-    setRoundResult(null);
-    setPot(40);
-    const shuffled = [...CARDS_DECK].sort(() => Math.random() - 0.5);
-    setPlayerCards(shuffled.slice(0, 3));
+  const handleStartMatch = async () => {
+    if (!user) return;
+    if ((user.walletBalance || 0) < ENTRY_COST) {
+      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Teen Patti table.`);
+      return;
+    }
+    await updateWalletBalance(-ENTRY_COST);
+    setHasPaidEntry(true);
+    setPlayerCards(drawHand());
+    setOpponentCards(drawHand());
+    setOpponentName(getRandomOpponentName());
+    setBetType('blind');
+    setPotAmount(100);
+    setShowCards(false);
+    setIsOpponentThinking(false);
+    setWinner(null);
+  };
+
+  const evaluateRankName = (hand: Card[]) => {
+    if (hand.length < 3) return 'High Card';
+    const nums = hand.map((c) => c.num).sort((a, b) => a - b);
+    const isTrail = nums[0] === nums[1] && nums[1] === nums[2];
+    const isSequence = nums[2] - nums[1] === 1 && nums[1] - nums[0] === 1;
+    const isColor = hand[0].suit === hand[1].suit && hand[1].suit === hand[2].suit;
+    const isPair = nums[0] === nums[1] || nums[1] === nums[2] || nums[0] === nums[2];
+
+    if (isTrail) return 'Trio / Trail 🔥';
+    if (isSequence && isColor) return 'Pure Sequence ✨';
+    if (isSequence) return 'Sequence ♠';
+    if (isColor) return 'Color Flush 🎨';
+    if (isPair) return 'Pair 🃏';
+    return 'High Card';
+  };
+
+  const handleShowdown = async () => {
+    if (showCards || winner || isOpponentThinking) return;
+
+    setIsOpponentThinking(true);
+    setTimeout(async () => {
+      setIsOpponentThinking(false);
+      setShowCards(true);
+
+      const playerScore = playerCards.reduce((sum, c) => sum + c.num, 0);
+      const opponentScore = opponentCards.reduce((sum, c) => sum + c.num, 0);
+
+      if (playerScore >= opponentScore) {
+        const winnerName = user?.name || 'Player';
+        setWinner(winnerName);
+        await updateWalletBalance(WIN_REWARD);
+        await recordGameMatch('teen-patti', 'Teen Patti Pro', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
+        confetti({ particleCount: 120, spread: 80 });
+      } else {
+        setWinner(opponentName);
+        await recordGameMatch('teen-patti', 'Teen Patti Pro', 'LOSS', ENTRY_COST, 0, opponentName);
+      }
+    }, 2000); // 2s thinking delay for realistic chaal showdown
   };
 
   return (
@@ -73,102 +111,119 @@ export default function TeenPattiPage() {
           <span>Back to All Games</span>
         </Link>
 
-        <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl">
+        <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6">
           
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold uppercase mb-1">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>High Stakes Poker</span>
+                <span>Casino VIP Table</span>
               </div>
-              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">
-                Royal Teen Patti
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
+                Teen Patti Pro
               </h1>
             </div>
 
-            <div className="flex items-center space-x-2 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-2xl text-amber-500 font-bold text-sm">
-              <Coins className="w-5 h-5" />
-              <span>Pot Size: {pot} Coins</span>
-            </div>
-          </div>
-
-          <div className="relative rounded-3xl bg-gradient-to-b from-emerald-900 to-emerald-950 border-8 border-amber-900/60 shadow-2xl p-8 min-h-[380px] flex flex-col justify-between overflow-hidden">
-            
-            <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="text-center relative z-10">
-              <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest block mb-2">Opponent Hand</span>
-              <div className="flex justify-center space-x-3">
-                {[1, 2, 3].map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="w-16 h-24 rounded-xl bg-amber-900 border-2 border-amber-400/50 shadow-lg flex items-center justify-center text-amber-400 font-bold text-lg"
-                  >
-                    {isRevealed ? (idx === 0 ? '♦K' : idx === 1 ? '♦Q' : '♦J') : '🂠'}
-                  </div>
-                ))}
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-extrabold text-sm">
+                <Wallet className="w-4 h-4" />
+                <span>Entry: ₹{ENTRY_COST} | Win: ₹{WIN_REWARD}</span>
               </div>
             </div>
+          </div>
 
-            <div className="text-center my-4 relative z-10">
-              {roundResult ? (
-                <div className="inline-flex items-center space-x-2 px-6 py-2 rounded-full bg-amber-400 text-slate-950 font-black text-lg shadow-xl animate-bounce">
-                  <Trophy className="w-5 h-5" />
-                  <span>{roundResult}</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center space-x-2 text-emerald-200 font-bold text-xs bg-emerald-950/80 px-4 py-1.5 rounded-full border border-emerald-800">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>Place bet or request Showdown</span>
-                </div>
-              )}
-            </div>
-
-            <div className="text-center relative z-10">
-              <div className="flex justify-center space-x-3 mb-2">
-                {playerCards.map((card, idx) => (
-                  <div
-                    key={idx}
-                    className="w-18 h-28 sm:w-20 sm:h-28 rounded-xl bg-white border-2 border-slate-200 shadow-2xl flex flex-col justify-between p-2 transform hover:-translate-y-2 transition-transform"
-                  >
-                    <span className={`text-sm font-extrabold ${card.color}`}>{card.value}</span>
-                    <span className={`text-3xl text-center ${card.color}`}>{card.suit}</span>
-                    <span className={`text-sm font-extrabold text-right ${card.color}`}>{card.value}</span>
-                  </div>
-                ))}
+          {!hasPaidEntry ? (
+            <div className="text-center py-12 px-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-6">
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-emerald-500 text-white flex items-center justify-center shadow-xl">
+                <Spade className="w-10 h-10 animate-bounce" />
               </div>
-              <span className="text-xs font-bold text-emerald-200 uppercase tracking-widest">Your Hand (Trio)</span>
+              <div className="max-w-md mx-auto space-y-2">
+                <h2 className="text-2xl font-black font-['Space_Grotesk']">High Stakes 3-Card Table</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Pay ₹50 entry to deal cards against live opponent <span className="font-bold text-emerald-500">{opponentName}</span>. Best hand wins ₹95!
+                </p>
+              </div>
+              <button
+                onClick={handleStartMatch}
+                className="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-lg shadow-xl shadow-emerald-500/25 transition-all"
+              >
+                Pay ₹50 & Deal Cards!
+              </button>
             </div>
+          ) : (
+            <div className="space-y-8">
+              
+              {/* Opponent Cards Section */}
+              <div className="text-center space-y-3">
+                <p className="text-xs font-extrabold text-slate-400 uppercase">Opponent: {opponentName}</p>
+                <div className="flex justify-center gap-3">
+                  {opponentCards.map((card, i) => (
+                    <div
+                      key={i}
+                      className="w-16 h-24 rounded-xl bg-slate-900 border-2 border-slate-700 flex items-center justify-center text-white text-xl font-bold shadow-xl"
+                    >
+                      {showCards ? `${card.value}${card.suit}` : '🂠'}
+                    </div>
+                  ))}
+                </div>
+                {showCards && (
+                  <span className="text-xs font-bold text-amber-500">{evaluateRankName(opponentCards)}</span>
+                )}
+              </div>
 
-          </div>
+              {/* Showdown Winner / Thinking Banner */}
+              <div className="text-center">
+                {winner ? (
+                  <div className="inline-flex items-center space-x-2 px-8 py-3 rounded-2xl bg-emerald-600 text-white font-black text-lg shadow-xl animate-bounce">
+                    <Trophy className="w-5 h-5 text-amber-300" />
+                    <span>{winner} Wins ₹{WIN_REWARD} Pot! 🎉</span>
+                  </div>
+                ) : isOpponentThinking ? (
+                  <div className="inline-flex items-center space-x-2 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-5 py-2 rounded-full border border-emerald-500/20">
+                    <Clock className="w-4 h-4 animate-spin" />
+                    <span>{opponentName} is placing Chaal bet...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleShowdown}
+                    className="px-8 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base shadow-xl transition-all"
+                  >
+                    Showdown & Claim Pot (₹{potAmount})!
+                  </button>
+                )}
+              </div>
 
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <button
-              onClick={placeBet}
-              disabled={!!roundResult}
-              className="py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-            >
-              <Coins className="w-4 h-4 text-amber-300" />
-              <span>Raise Bet (+10 Coins)</span>
-            </button>
+              {/* Player Cards Section */}
+              <div className="text-center space-y-3">
+                <p className="text-xs font-extrabold text-emerald-500 uppercase">{user?.name}'s Hand (You)</p>
+                <div className="flex justify-center gap-3">
+                  {playerCards.map((card, i) => (
+                    <div
+                      key={i}
+                      className="w-16 h-24 rounded-xl bg-white text-slate-900 border-2 border-slate-300 flex flex-col items-center justify-center text-xl font-black shadow-xl"
+                    >
+                      <span>{card.value}</span>
+                      <span className={card.suit === '♥' || card.suit === '♦' ? 'text-rose-600' : 'text-slate-900'}>
+                        {card.suit}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <span className="text-xs font-bold text-emerald-500">{evaluateRankName(playerCards)}</span>
+              </div>
 
-            <button
-              onClick={showDown}
-              disabled={!!roundResult}
-              className="py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-            >
-              <Eye className="w-4 h-4" />
-              <span>Showdown (Show Cards)</span>
-            </button>
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={handleStartMatch}
+                  className="px-6 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center space-x-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Deal Next Table (₹50 Entry)</span>
+                </button>
+              </div>
 
-            <button
-              onClick={nextHand}
-              className="py-3.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all flex items-center justify-center space-x-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Deal Next Hand</span>
-            </button>
-          </div>
+            </div>
+          )}
 
         </div>
       </div>

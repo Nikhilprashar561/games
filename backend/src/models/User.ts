@@ -3,8 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   name: string;
   email: string;
-  password?: string;
-  coins: number;
+  walletBalance: number; // Real Money Balance in ₹ Rupees
+  upiId: string;
   avatar: string;
   createdAt: Date;
 }
@@ -22,14 +22,13 @@ const UserSchema: Schema = new Schema({
     lowercase: true,
     trim: true,
   },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: 6,
-  },
-  coins: {
+  walletBalance: {
     type: Number,
-    default: 100,
+    default: 500, // ₹500 Default real money wallet balance
+  },
+  upiId: {
+    type: String,
+    default: 'user@paytm',
   },
   avatar: {
     type: String,

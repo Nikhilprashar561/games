@@ -4,17 +4,17 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, Coins, Sparkles, Trophy, RotateCcw, Frown, Gift, Bomb, X } from 'lucide-react';
+import { ArrowLeft, Wallet, Sparkles, Trophy, RotateCcw, Gift, Bomb, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface GridTile {
   num: number;
-  reward: number; // 0 = bomb/loss, >0 = won coins
+  reward: number; // 0 = bomb/loss, >0 = won ₹ rupees
   isFlipped: boolean;
 }
 
 export default function NumberPredictPage() {
-  const { user, updateUserCoins, openAuthModal } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal } = useAuth();
   const ENTRY_COST = 10;
 
   const [hasEntered, setHasEntered] = useState<boolean>(false);
@@ -23,19 +23,38 @@ export default function NumberPredictPage() {
   const [showPopupModal, setShowPopupModal] = useState<boolean>(false);
   const [popupMessage, setPopupMessage] = useState<{ title: string; desc: string; type: 'win' | 'sorry' } | null>(null);
 
+  // Generate unsystematically shuffled 1-100 grid with strict 25% win odds
   const initializeGrid = () => {
-    const newTiles: GridTile[] = Array.from({ length: 100 }, (_, i) => {
-      const num = i + 1;
-      const rand = Math.random();
-      let reward = 0;
-      if (rand < 0.08) reward = 250; // Mega Jackpot
-      else if (rand < 0.20) reward = 100; // Big Win
-      else if (rand < 0.40) reward = 50;  // Win
-      else if (rand < 0.55) reward = 20;  // Double entry
-      else reward = 0; // Bomb / Loss
+    // 1 to 100 numbers array
+    const numbers = Array.from({ length: 100 }, (_, i) => i + 1);
+    // Shuffle array unsystematically
+    for (let i = numbers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+    }
 
-      return { num, reward, isFlipped: false };
-    });
+    // Exactly 25 winning tiles (25% probability)
+    // 2 x ₹250, 5 x ₹100, 8 x ₹50, 10 x ₹20 = 25 winning tiles
+    const rewardsPool = [
+      ...Array(2).fill(250),
+      ...Array(5).fill(100),
+      ...Array(8).fill(50),
+      ...Array(10).fill(20),
+      ...Array(75).fill(0), // 75 bomb tiles
+    ];
+
+    // Shuffle rewards pool
+    for (let i = rewardsPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rewardsPool[i], rewardsPool[j]] = [rewardsPool[j], rewardsPool[i]];
+    }
+
+    const newTiles: GridTile[] = numbers.map((num, idx) => ({
+      num,
+      reward: rewardsPool[idx],
+      isFlipped: false,
+    }));
+
     setTiles(newTiles);
   };
 
@@ -44,12 +63,12 @@ export default function NumberPredictPage() {
       openAuthModal();
       return;
     }
-    if (user.coins < ENTRY_COST) {
-      alert('You need at least 10 coins to flip a tile!');
+    if ((user.walletBalance || 0) < ENTRY_COST) {
+      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to flip a tile.`);
       return;
     }
 
-    await updateUserCoins(-ENTRY_COST);
+    await updateWalletBalance(-ENTRY_COST);
     initializeGrid();
     setHasEntered(true);
     setFlippedTile(null);
@@ -65,19 +84,22 @@ export default function NumberPredictPage() {
     setFlippedTile(selected);
 
     if (selected.reward > 0) {
-      // WIN: Add coins directly to account & remove number, display won coins
-      await updateUserCoins(selected.reward);
+      // WIN: Credit real money directly to user wallet
+      await updateWalletBalance(selected.reward);
+      await recordGameMatch('number-predict', 'Number Predict & Win', 'WIN', ENTRY_COST, selected.reward, 'Jackpot Grid');
       confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
+
       setPopupMessage({
-        title: `YOU WON +${selected.reward} COINS! 🎉`,
-        desc: `Tile #${selected.num} contained +${selected.reward} Coins! They have been added to your balance.`,
+        title: `CONGRATULATIONS! YOU WON ₹${selected.reward}! 🎉`,
+        desc: `Tile #${selected.num} contained ₹${selected.reward}! Money has been credited directly to your Wallet Account.`,
         type: 'win',
       });
     } else {
-      // LOSS: Bomb explosion over tile & popup "Better luck next time!"
+      // LOSS: 75% bomb tile
+      await recordGameMatch('number-predict', 'Number Predict & Win', 'LOSS', ENTRY_COST, 0, 'Jackpot Grid');
       setPopupMessage({
-        title: 'Better luck next time! 💣',
-        desc: `You triggered a bomb on Tile #${selected.num}! Better luck next time!`,
+        title: 'Better Luck Next Time! 💣',
+        desc: `Tile #${selected.num} triggered a bomb! Try again for cash rewards!`,
         type: 'sorry',
       });
     }
@@ -95,7 +117,7 @@ export default function NumberPredictPage() {
           <span>Back to All Games</span>
         </Link>
 
-        {/* Main Game Container: Strict High-Contrast Pure Dark & White Theme */}
+        {/* Main High-Contrast Dark & White Grid Container */}
         <div className="rounded-3xl p-6 sm:p-10 border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white shadow-2xl transition-colors duration-300">
           
           {/* Header */}
@@ -103,24 +125,22 @@ export default function NumberPredictPage() {
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-bold uppercase mb-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>1 to 100 Mystery Grid</span>
+                <span>25% Win Rate Cash Grid</span>
               </div>
               <h1 className="text-3xl font-black text-black dark:text-white font-['Space_Grotesk']">
                 Number Predict & Win
               </h1>
             </div>
 
-            {/* Entry Cost Badge */}
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 font-extrabold text-sm">
-                <Coins className="w-4 h-4" />
-                <span>Entry Fee: {ENTRY_COST} Coins</span>
+                <Wallet className="w-4 h-4" />
+                <span>Entry Fee: ₹{ENTRY_COST}</span>
               </div>
             </div>
           </div>
 
           {!hasEntered ? (
-            /* Entry Prompt */
             <div className="text-center py-12 px-6 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/20 dark:border-white/20 space-y-6">
               <div className="w-20 h-20 mx-auto rounded-3xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center shadow-2xl border border-black dark:border-white">
                 <Gift className="w-10 h-10 animate-bounce" />
@@ -128,10 +148,10 @@ export default function NumberPredictPage() {
 
               <div className="max-w-md mx-auto space-y-2">
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">
-                  Flip 1 Tile on the 100 Grid!
+                  Flip 1 Tile to Win Up To ₹250!
                 </h2>
                 <p className="text-sm opacity-80 leading-relaxed font-semibold">
-                  Pay <span className="font-bold underline">10 coins</span> to unlock the 1-100 grid. Pick 1 tile to flip and instantly win coin rewards or trigger a bomb!
+                  Pay <span className="font-bold underline">₹10 entry</span> to reveal the unsystematically shuffled grid. 25 tiles contain real money cash prizes!
                 </p>
               </div>
 
@@ -139,11 +159,10 @@ export default function NumberPredictPage() {
                 onClick={handleEnterGame}
                 className="px-8 py-4 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-2xl border border-black dark:border-white hover:scale-105 transition-all"
               >
-                Pay 10 Coins & Reveal Grid!
+                Pay ₹10 & Reveal Grid!
               </button>
             </div>
           ) : (
-            /* Active Grid Section */
             <div className="space-y-6">
               
               <div className="text-center">
@@ -152,7 +171,7 @@ export default function NumberPredictPage() {
                     {flippedTile.reward > 0 ? (
                       <>
                         <Trophy className="w-6 h-6 text-amber-400 animate-bounce" />
-                        <span>REVEALED TILE #{flippedTile.num} AND WON +{flippedTile.reward} COINS! 🎉</span>
+                        <span>REVEALED TILE #{flippedTile.num} AND WON ₹{flippedTile.reward}! 🎉</span>
                       </>
                     ) : (
                       <>
@@ -169,11 +188,11 @@ export default function NumberPredictPage() {
                 )}
               </div>
 
-              {/* 10x10 Pure Black & White Grid */}
+              {/* Unsystematic Shuffled 10x10 Grid */}
               <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 sm:gap-2.5 max-w-4xl mx-auto p-4 rounded-3xl bg-black dark:bg-black border-4 border-black dark:border-white shadow-2xl relative">
                 {tiles.map((tile, idx) => (
                   <button
-                    key={tile.num}
+                    key={`${tile.num}-${idx}`}
                     disabled={!!flippedTile}
                     onClick={() => handleTileClick(idx)}
                     className={`aspect-square rounded-xl text-xs sm:text-sm font-black flex items-center justify-center transition-all duration-300 transform select-none shadow-md relative overflow-hidden ${
@@ -186,25 +205,22 @@ export default function NumberPredictPage() {
                   >
                     {tile.isFlipped ? (
                       tile.reward > 0 ? (
-                        /* Tile Number Removed -> Replaced by Won Coin Badge */
                         <span className="text-[10px] sm:text-xs font-black tracking-tighter text-black">
-                          +{tile.reward}
+                          ₹{tile.reward}
                         </span>
                       ) : (
-                        /* Bomb Explosion Animation over tile */
                         <div className="flex items-center justify-center animate-bounce">
                           <Bomb className="w-5 h-5 text-rose-500 animate-pulse" />
                         </div>
                       )
                     ) : (
-                      /* Display Tile Number before flip */
+                      /* Display Shuffled Tile Number */
                       <span>{tile.num}</span>
                     )}
                   </button>
                 ))}
               </div>
 
-              {/* Reset / Flip Again Button */}
               {flippedTile && (
                 <div className="flex justify-center pt-4">
                   <button
@@ -212,7 +228,7 @@ export default function NumberPredictPage() {
                     className="px-8 py-3.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-sm border-2 border-black dark:border-white hover:scale-105 transition-all flex items-center space-x-2 shadow-xl"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Flip Another Tile (10 Coins)</span>
+                    <span>Play Again (₹10 Entry)</span>
                   </button>
                 </div>
               )}
@@ -222,7 +238,7 @@ export default function NumberPredictPage() {
 
         </div>
 
-        {/* Loss / Win Result Modal Popup */}
+        {/* Win/Loss Modal */}
         {showPopupModal && popupMessage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
             <div className="relative w-full max-w-md p-8 rounded-3xl bg-white dark:bg-black border-4 border-black dark:border-white text-black dark:text-white shadow-2xl text-center space-y-6">
@@ -256,7 +272,7 @@ export default function NumberPredictPage() {
                   onClick={handleEnterGame}
                   className="w-full py-3.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-sm border-2 border-black dark:border-white transition-all shadow-lg"
                 >
-                  Play Again (10 Coins)
+                  Play Again (₹10 Stake)
                 </button>
                 <button
                   onClick={() => setShowPopupModal(false)}
