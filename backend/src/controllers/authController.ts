@@ -22,7 +22,7 @@ const generate4DigitOTP = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// @desc    Send 4-Digit OTP to Email (Cloud Compatible & Bulletproof Error Handling)
+// @desc    Send 4-Digit OTP to Email
 // @route   POST /api/auth/send-otp
 export const sendOTP = async (req: Request, res: Response) => {
   try {
@@ -36,8 +36,6 @@ export const sendOTP = async (req: Request, res: Response) => {
     const displayName = cleanEmail.split('@')[0];
     const otp = generate4DigitOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-
-    let userObjName = displayName;
 
     try {
       let user = await User.findOne({ email: cleanEmail });
@@ -57,18 +55,9 @@ export const sendOTP = async (req: Request, res: Response) => {
         user.otp = otp;
         user.otpExpires = otpExpires;
         await user.save();
-        userObjName = user.name;
       }
 
-      // Guaranteed Email Delivery Check
-      const emailResult = await sendOTPEmail(cleanEmail, otp, userObjName);
-
-      if (!emailResult.success) {
-        return res.status(500).json({
-          message: `Failed to deliver OTP email: ${emailResult.error || 'SMTP delivery error'}`,
-        });
-      }
-
+      await sendOTPEmail(cleanEmail, otp, user.name);
       return res.json({
         success: true,
         message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
@@ -93,15 +82,7 @@ export const sendOTP = async (req: Request, res: Response) => {
       }
       fallbackUsers.set(cleanEmail, mockUser);
 
-      // Guaranteed Email Delivery Check
-      const emailResult = await sendOTPEmail(cleanEmail, otp, mockUser.name);
-
-      if (!emailResult.success) {
-        return res.status(500).json({
-          message: `Failed to deliver OTP email: ${emailResult.error || 'SMTP delivery error'}`,
-        });
-      }
-
+      await sendOTPEmail(cleanEmail, otp, mockUser.name);
       return res.json({
         success: true,
         message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
@@ -261,11 +242,7 @@ export const requestEmailChange = async (req: AuthRequest, res: Response) => {
         user.pendingEmailOtpExpires = otpExpires;
         await user.save();
 
-        const emailResult = await sendOTPEmail(cleanNewEmail, otp, user.name, true);
-        if (!emailResult.success) {
-          return res.status(500).json({ message: `Could not send verification OTP to new email: ${emailResult.error}` });
-        }
-
+        await sendOTPEmail(cleanNewEmail, otp, user.name, true);
         return res.json({ success: true, message: `Verification OTP sent to ${cleanNewEmail}` });
       }
     } catch (err) {
