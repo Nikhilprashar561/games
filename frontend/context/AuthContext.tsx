@@ -35,10 +35,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const RAZORPAY_KEY = 'rzp_test_TIpe464KQ9auim';
-
 // Set Axios Base URL for Backend API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://games-zg86.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 axios.defaults.baseURL = API_BASE_URL;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -47,14 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
-
-  // Load Razorpay Checkout SDK Script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-  }, []);
 
   // Restore Session on Mount
   useEffect(() => {
@@ -308,59 +298,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Trigger Razorpay Payment Modal
+  // Instant Wallet Money Top Up (Razorpay Removed)
   const openRazorpayCheckout = async (amount: number) => {
     if (!user) {
       openAuthModal();
       return;
     }
 
-    try {
-      const orderRes = await axios.post('/api/payment/create-order', { amount });
-      const orderData = orderRes.data;
-
-      const options = {
-        key: RAZORPAY_KEY,
-        amount: orderData.amount || amount * 100,
-        currency: 'INR',
-        name: 'Baazi Board Gaming Arena',
-        description: `Wallet Money Top Up - ₹${amount}`,
-        image: '/images/logo.png',
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
-          await axios.post('/api/payment/verify', {
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            amount,
-          });
-
-          await updateWalletBalance(amount);
-          setWelcomeToast(`Successfully added ₹${amount} to your wallet! 💰`);
-          setTimeout(() => setWelcomeToast(null), 3500);
-        },
-        prefill: {
-          name: user.name,
-          email: user.email,
-        },
-        theme: {
-          color: '#10b981',
-        },
-      };
-
-      if ((window as any).Razorpay) {
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-      } else {
-        await updateWalletBalance(amount);
-        setWelcomeToast(`Successfully added ₹${amount} to your wallet! 💰`);
-        setTimeout(() => setWelcomeToast(null), 3500);
-      }
-    } catch (err) {
-      await updateWalletBalance(amount);
-      setWelcomeToast(`Successfully added ₹${amount} to your wallet! 💰`);
-      setTimeout(() => setWelcomeToast(null), 3500);
-    }
+    await updateWalletBalance(amount);
+    setWelcomeToast(`Successfully added ₹${amount} to your wallet balance! 💰`);
+    setTimeout(() => setWelcomeToast(null), 3500);
   };
 
   return (

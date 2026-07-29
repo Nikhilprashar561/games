@@ -4,7 +4,21 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, RotateCcw, ShieldCheck, Trophy, Wallet, Clock, Star, Sparkles, Crown, Users, Zap } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  RotateCcw,
+  Wallet,
+  Clock,
+  Star,
+  Sparkles,
+  Crown,
+  Users,
+  Zap,
+  Brain,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 
@@ -52,6 +66,118 @@ const OPPOSITE_COLORS: Record<PlayerColor, PlayerColor> = {
   blue: 'green',
 };
 
+// Visual theme per color — tuned to match the reference board art (deep saturated tiles + glossy pawns)
+const COLOR_THEME: Record<PlayerColor, { base: string; tile: string; text: string; grad: [string, string]; ring: string }> = {
+  red: { base: 'bg-rose-600', tile: 'bg-rose-600', text: 'text-white', grad: ['#fda4af', '#9f1239'], ring: '#fecdd3' },
+  green: { base: 'bg-green-600', tile: 'bg-green-600', text: 'text-white', grad: ['#86efac', '#166534'], ring: '#bbf7d0' },
+  yellow: { base: 'bg-amber-500', tile: 'bg-amber-500', text: 'text-slate-950', grad: ['#fde68a', '#b45309'], ring: '#fef3c7' },
+  blue: { base: 'bg-blue-600', tile: 'bg-blue-600', text: 'text-white', grad: ['#93c5fd', '#1e40af'], ring: '#bfdbfe' },
+};
+
+// Color mapping for Teardrop Location Pin Markers
+const PIN_COLOR_HEX: Record<PlayerColor, { main: string; border: string }> = {
+  red: { main: '#e11d48', border: '#ffe4e6' },
+  green: { main: '#16a34a', border: '#dcfce7' },
+  yellow: { main: '#eab308', border: '#fef9c3' },
+  blue: { main: '#2563eb', border: '#dbeafe' },
+};
+
+const FACE_ROTATIONS: Record<number, { x: number; y: number }> = {
+  1: { x: -90, y: 0 },
+  2: { x: 0, y: 0 },
+  3: { x: 0, y: -90 },
+  4: { x: 0, y: 90 },
+  5: { x: 0, y: 180 },
+  6: { x: 90, y: 0 },
+};
+
+const PIP_LAYOUTS: Record<number, [number, number][]> = {
+  1: [[50, 50]],
+  2: [
+    [26, 26],
+    [74, 74],
+  ],
+  3: [
+    [26, 26],
+    [50, 50],
+    [74, 74],
+  ],
+  4: [
+    [26, 26],
+    [74, 26],
+    [26, 74],
+    [74, 74],
+  ],
+  5: [
+    [26, 26],
+    [74, 26],
+    [50, 50],
+    [26, 74],
+    [74, 74],
+  ],
+  6: [
+    [26, 22],
+    [74, 22],
+    [26, 50],
+    [74, 50],
+    [26, 78],
+    [74, 78],
+  ],
+};
+
+const DICE_SIZE = 64; // px
+const DICE_HALF = DICE_SIZE / 2;
+
+function DiceFace({ value, transform }: { value: number; transform: string }) {
+  return (
+    <div
+      className="absolute inset-0 rounded-xl bg-gradient-to-br from-white to-slate-200 border border-slate-300 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.15)]"
+      style={{ transform, backfaceVisibility: 'hidden' }}
+    >
+      {PIP_LAYOUTS[value].map(([px, py], idx) => (
+        <span
+          key={idx}
+          className={`absolute w-[9px] h-[9px] rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)] ${
+            value === 1 ? 'bg-rose-600' : 'bg-slate-900'
+          }`}
+          style={{ left: `${px}%`, top: `${py}%`, transform: 'translate(-50%,-50%)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rolling: boolean }) {
+  return (
+    <div className="flex flex-col items-center" style={{ perspective: '700px' }}>
+      <div
+        className="relative"
+        style={{
+          width: DICE_SIZE,
+          height: DICE_SIZE,
+          transformStyle: 'preserve-3d',
+          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+          transition: 'transform 1.8s cubic-bezier(0.15, 0.85, 0.35, 1)',
+        }}
+      >
+        <DiceFace value={2} transform={`rotateY(0deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={5} transform={`rotateY(180deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={3} transform={`rotateY(90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={4} transform={`rotateY(-90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={1} transform={`rotateX(90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={6} transform={`rotateX(-90deg) translateZ(${DICE_HALF}px)`} />
+      </div>
+      <div
+        className="mt-3 rounded-full bg-black/40 blur-[2px] transition-all duration-300"
+        style={{ width: rolling ? 30 : 42, height: 8, opacity: rolling ? 0.25 : 0.4 }}
+      />
+    </div>
+  );
+}
+
+// A little randomness helper — makes timers feel human instead of mechanically fixed
+const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (max - min));
+
 export default function LudoPage() {
   const { user, updateWalletBalance, recordGameMatch } = useAuth();
   const ENTRY_COST = 25;
@@ -71,10 +197,23 @@ export default function LudoPage() {
   const [currentTurn, setCurrentTurn] = useState<PlayerColor>('red');
   const [opponentName, setOpponentName] = useState<string>('Neha_Star');
   const [diceVal, setDiceVal] = useState<number>(6);
+  const [cubeRotation, setCubeRotation] = useState<{ x: number; y: number }>(() => ({ ...FACE_ROTATIONS[6] }));
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [hasRolled, setHasRolled] = useState<boolean>(false);
   const [isOpponentThinking, setIsOpponentThinking] = useState<boolean>(false);
   const [consecutiveSixes, setConsecutiveSixes] = useState<number>(0);
+
+  const spinCubeTo = (value: number) => {
+    setCubeRotation((prev) => {
+      const normX = ((prev.x % 360) + 360) % 360;
+      const normY = ((prev.y % 360) + 360) % 360;
+      const target = FACE_ROTATIONS[value];
+      return {
+        x: prev.x - normX + 1440 + target.x,
+        y: prev.y - normY + 2160 + target.y,
+      };
+    });
+  };
   const [winner, setWinner] = useState<string | null>(null);
 
   const [travelingTokenId, setTravelingTokenId] = useState<{ color: PlayerColor; id: number } | null>(null);
@@ -143,54 +282,81 @@ export default function LudoPage() {
     });
   };
 
-  // Master Strategic Move Selector for Opponent Players
-  const getStrategicOpponentTokenMove = (color: PlayerColor, dice: number, movableTokens: Token[]): Token => {
-    // Priority 1: Capture an opponent token!
+  // ---------- SMARTER OPPONENT BRAIN ----------
+  // Instead of a fixed priority list, every legal move is scored on several
+  // strategic factors and the opponent picks whichever move has the best
+  // expected outcome — closer to how a thinking player would decide.
+
+  const simulateMove = (color: PlayerColor, tok: Token, dice: number) => {
+    const stepCount = tok.stepCount + dice;
+    let position: number;
+    if (stepCount === 57) position = 200;
+    else if (stepCount > 51) position = 100 + (stepCount - 52);
+    else position = (START_INDEXES[color] + (stepCount - 1)) % 52;
+    return { stepCount, position };
+  };
+
+  // Is a circuit cell within striking distance (1-6) of any enemy token?
+  const isPositionVulnerable = (position: number, opponents: PlayerColor[]): boolean => {
+    if (position < 0 || position >= 100) return false; // home stretch / base / finished = untouchable
+    if (SAFE_INDEXES.includes(position)) return false;
+    for (const oc of opponents) {
+      for (const ot of tokens[oc]) {
+        if (ot.position < 0 || ot.position >= 100) continue;
+        const diff = (position - ot.position + 52) % 52;
+        if (diff >= 1 && diff <= 6) return true;
+      }
+    }
+    return false;
+  };
+
+  const getSmartMove = (color: PlayerColor, dice: number, movableTokens: Token[]): Token => {
+    const opponents = turnOrder.filter((c) => c !== color);
+    let best = movableTokens[0];
+    let bestScore = -Infinity;
+
     for (const tok of movableTokens) {
-      if (tok.position !== -1) {
-        const nextStep = tok.stepCount + dice;
-        if (nextStep < 52) {
-          const startIdx = START_INDEXES[color];
-          const targetPos = (startIdx + (nextStep - 1)) % 52;
-          if (!SAFE_INDEXES.includes(targetPos)) {
-            for (const otherColor of turnOrder) {
-              if (otherColor !== color) {
-                if (tokens[otherColor].some((et) => et.position === targetPos)) {
-                  return tok;
-                }
-              }
+      let score = dice; // baseline: raw progress made
+
+      if (tok.position === -1) {
+        // Bringing a fresh token into play — valuable early, less so if board is crowded
+        const activeCount = tokens[color].filter((t) => t.position !== -1 && t.position !== 200).length;
+        score += 20 - activeCount * 3;
+      } else {
+        const { stepCount, position } = simulateMove(color, tok, dice);
+        let captured = false;
+
+        if (position < 52 && !SAFE_INDEXES.includes(position)) {
+          for (const oc of opponents) {
+            const victim = tokens[oc].find((ot) => ot.position === position);
+            if (victim) {
+              score += 60 + victim.stepCount * 0.6; // reward capturing advanced enemies most
+              captured = true;
             }
           }
         }
-      }
-    }
 
-    // Priority 2: Finish into Center Home (step 57)
-    const homeFinishTok = movableTokens.find((tok) => tok.stepCount + dice === 57);
-    if (homeFinishTok) return homeFinishTok;
+        if (stepCount === 57) score += 130; // finishing a token is huge
+        else if (position >= 100) score += 26; // entering the safe home stretch
+        else if (SAFE_INDEXES.includes(position)) score += 22; // landing on a star cell
 
-    // Priority 3: Release token from Base on 6
-    if (dice === 6) {
-      const baseTok = movableTokens.find((tok) => tok.position === -1);
-      if (baseTok) return baseTok;
-    }
-
-    // Priority 4: Land on a Safe Star Cell (⭐)
-    for (const tok of movableTokens) {
-      if (tok.position !== -1) {
-        const nextStep = tok.stepCount + dice;
-        if (nextStep < 52) {
-          const startIdx = START_INDEXES[color];
-          const targetPos = (startIdx + (nextStep - 1)) % 52;
-          if (SAFE_INDEXES.includes(targetPos)) {
-            return tok;
-          }
+        if (!captured) {
+          const wasExposed = isPositionVulnerable(tok.position, opponents);
+          const willBeExposed = isPositionVulnerable(position, opponents);
+          if (willBeExposed) score -= 34; // don't walk into danger
+          if (wasExposed && !willBeExposed) score += 16; // reward escaping danger
         }
+
+        score += tok.stepCount * 0.12; // mild preference for pushing the lead token home
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = tok;
       }
     }
 
-    // Priority 5: Pick the token furthest along the track
-    return movableTokens.reduce((prev, curr) => (curr.stepCount > prev.stepCount ? curr : prev), movableTokens[0]);
+    return best;
   };
 
   useEffect(() => {
@@ -198,79 +364,84 @@ export default function LudoPage() {
 
     if (currentTurn !== userColor) {
       setIsOpponentThinking(true);
+      // Randomized "thinking" delay so the AI doesn't feel mechanically instant
       const timer = setTimeout(() => {
         opponentAutoPlay();
-      }, 2000);
+      }, jitter(1300, 2600));
       return () => clearTimeout(timer);
     }
   }, [currentTurn, hasPaidEntry, winner, userColor]);
 
   const opponentAutoPlay = () => {
+    const roll = Math.floor(Math.random() * 6) + 1;
     setIsRolling(true);
-    let count = 0;
-    const rollInterval = setInterval(() => {
-      setDiceVal(Math.floor(Math.random() * 6) + 1);
-      count++;
-      if (count >= 10) {
-        clearInterval(rollInterval);
-        setIsRolling(false);
-        const roll = Math.floor(Math.random() * 6) + 1;
-        setDiceVal(roll);
+    spinCubeTo(roll);
+    setTimeout(() => {
+      setDiceVal(roll);
+      setIsRolling(false);
 
-        const movable = getMovableTokens(currentTurn, roll);
-        if (movable.length === 0 && roll !== 6) {
-          setIsOpponentThinking(false);
-          nextTurn();
-        } else if (movable.length > 0) {
-          const chosen = getStrategicOpponentTokenMove(currentTurn, roll, movable);
-          executeMoveToken(currentTurn, chosen.id, roll, () => {
-            setIsOpponentThinking(false);
-          });
+      const movable = getMovableTokens(currentTurn, roll);
+      if (movable.length === 0) {
+        if (roll === 6) {
+          // Bonus roll for 6 even if no token could move
+          setTimeout(opponentAutoPlay, 500);
         } else {
           setIsOpponentThinking(false);
           nextTurn();
         }
+      } else {
+        const chosen = getSmartMove(currentTurn, roll, movable);
+        setTimeout(() => {
+          executeMoveToken(currentTurn, chosen.id, roll, () => {
+            setIsOpponentThinking(false);
+          });
+        }, jitter(250, 550));
       }
-    }, 100);
+    }, 1800);
   };
 
   const rollDice = () => {
     if (isRolling || hasRolled || currentTurn !== userColor || !!winner || isOpponentThinking) return;
 
+    const finalRoll = Math.floor(Math.random() * 6) + 1;
     setIsRolling(true);
-    let count = 0;
-    const interval = setInterval(() => {
-      setDiceVal(Math.floor(Math.random() * 6) + 1);
-      count++;
-      if (count >= 10) {
-        clearInterval(interval);
-        const finalRoll = Math.floor(Math.random() * 6) + 1;
-        setDiceVal(finalRoll);
-        setIsRolling(false);
-        setHasRolled(true);
+    spinCubeTo(finalRoll);
+    setTimeout(() => {
+      setDiceVal(finalRoll);
+      setIsRolling(false);
+      setHasRolled(true);
 
-        if (finalRoll === 6) {
-          const sixes = consecutiveSixes + 1;
-          setConsecutiveSixes(sixes);
-          if (sixes >= 3) {
-            setConsecutiveSixes(0);
-            setHasRolled(false);
-            nextTurn();
-            return;
-          }
-        } else {
+      if (finalRoll === 6) {
+        const sixes = consecutiveSixes + 1;
+        setConsecutiveSixes(sixes);
+        if (sixes >= 3) {
           setConsecutiveSixes(0);
+          setHasRolled(false);
+          nextTurn();
+          return;
         }
+      } else {
+        setConsecutiveSixes(0);
+      }
 
-        const movable = getMovableTokens(userColor, finalRoll);
-        if (movable.length === 0 && finalRoll !== 6) {
+      const movable = getMovableTokens(userColor, finalRoll);
+      if (movable.length === 1 && finalRoll === 6 && tokens[userColor].every((t) => t.position === -1)) {
+        // Auto-unlock first token from base on rolling 6 for smooth gameplay!
+        setTimeout(() => {
+          executeMoveToken(userColor, movable[0].id, 6);
+        }, 400);
+      } else if (movable.length === 0) {
+        if (finalRoll === 6) {
+          // Reset hasRolled so player can roll their bonus 6 turn!
+          setTimeout(() => setHasRolled(false), 500);
+        } else {
           setTimeout(() => {
             setHasRolled(false);
             nextTurn();
           }, 600);
         }
       }
-    }, 100);
+    }, 1800);
   };
 
   const getTokenCellCoords = (color: PlayerColor, stepCount: number, position: number): [number, number] | null => {
@@ -286,9 +457,17 @@ export default function LudoPage() {
 
     setTravelingTokenId({ color, id: tokenId });
 
+    // Deep-clone tokens to guarantee React detects state changes & re-renders immediately
+    const cloneTokens = (): Record<PlayerColor, Token[]> => ({
+      red: tokens.red.map((t) => ({ ...t })),
+      green: tokens.green.map((t) => ({ ...t })),
+      yellow: tokens.yellow.map((t) => ({ ...t })),
+      blue: tokens.blue.map((t) => ({ ...t })),
+    });
+
     if (targetToken.position === -1) {
       if (dice !== 6) return;
-      const newTokens = { ...tokens };
+      const newTokens = cloneTokens();
       const tok = newTokens[color].find((t) => t.id === tokenId)!;
       tok.position = START_INDEXES[color];
       tok.stepCount = 1;
@@ -309,7 +488,7 @@ export default function LudoPage() {
 
     const moveInterval = setInterval(() => {
       currentStep += 1;
-      const newTokens = { ...tokens };
+      const newTokens = cloneTokens();
       const tok = newTokens[color].find((t) => t.id === tokenId)!;
       tok.stepCount = currentStep;
 
@@ -326,7 +505,7 @@ export default function LudoPage() {
       const cell = getTokenCellCoords(color, currentStep, tok.position);
       if (cell) pathCoords.push(cell);
       setTravelPath([...pathCoords]);
-      setTokens({ ...newTokens });
+      setTokens(newTokens);
 
       if (currentStep >= targetStep) {
         clearInterval(moveInterval);
@@ -372,7 +551,7 @@ export default function LudoPage() {
 
         if (onComplete) onComplete();
       }
-    }, 130);
+    }, 300);
   };
 
   const handlePlayerTokenClick = (tokenId: number) => {
@@ -392,6 +571,7 @@ export default function LudoPage() {
     setTurnTimer(15);
   };
 
+  // ---------- 3D DICE (kept on the side panel, same interaction — just restyled) ----------
   const renderPhotorealistic3DDice = (value: number) => {
     const dotPositions: Record<number, string[]> = {
       1: ['col-start-2 row-start-2'],
@@ -404,53 +584,111 @@ export default function LudoPage() {
 
     return (
       <div
-        className={`relative w-24 h-24 rounded-[26px] bg-gradient-to-br from-white via-slate-100 to-slate-300 border-4 border-slate-300 shadow-[0_15px_30px_rgba(0,0,0,0.4)] p-3 grid grid-cols-3 grid-rows-3 gap-1 items-center justify-items-center transition-all transform duration-500 ${
-          isRolling ? 'rotate-[720deg] scale-110 animate-spin' : 'hover:scale-105'
+        className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-[26px] bg-gradient-to-br from-white via-slate-100 to-slate-300 border-4 border-slate-300 shadow-[0_18px_36px_rgba(0,0,0,0.45)] p-3 grid grid-cols-3 grid-rows-3 gap-1 items-center justify-items-center ${
+          isRolling ? 'animate-dice-roll' : 'animate-dice-idle'
         }`}
-        style={{
-          transform: isRolling
-            ? 'rotateX(720deg) rotateY(720deg) scale(1.1)'
-            : 'perspective(600px) rotateX(12deg) rotateY(-12deg)',
-        }}
       >
         {(dotPositions[value] || dotPositions[6]).map((posClass, idx) => (
           <div
             key={idx}
-            className={`w-4 h-4 rounded-full bg-slate-950 shadow-[inset_0_3px_6px_rgba(0,0,0,0.9)] ${posClass}`}
+            className={`w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full bg-slate-950 shadow-[inset_0_3px_6px_rgba(0,0,0,0.9)] ${posClass}`}
           ></div>
         ))}
       </div>
     );
   };
 
-  const renderExactTeardropPinMarker = (color: PlayerColor, isSelectable: boolean = false, isTraveling: boolean = false) => {
-    const pinHex =
-      color === 'red'
-        ? '#e11d48'
-        : color === 'green'
-        ? '#10b981'
-        : color === 'yellow'
-        ? '#f59e0b'
-        : '#0ea5e9';
+// ---------- TEARDROP LOCATION PIN MARKER (Dead-Center Aligned) ----------
+const renderPawn = (
+  color: PlayerColor,
+  isSelectable: boolean = false,
+  isTraveling: boolean = false,
+  scaleFactor: 'normal' | 'medium' | 'small' = 'normal'
+) => {
+  const { main, border } = PIN_COLOR_HEX[color];
+
+  // Fixed size classes to prevent height/width distortion or layout shifts
+  const sizeClasses =
+    scaleFactor === 'small'
+      ? 'w-3.5 h-4.5 sm:w-4 sm:h-5'
+      : scaleFactor === 'medium'
+      ? 'w-4.5 h-5.5 sm:w-5 sm:h-6'
+      : 'w-6 h-7 sm:w-7 sm:h-8';
+
+  return (
+    <div
+      className={`relative flex items-center justify-center cursor-pointer transition-opacity duration-150 ${sizeClasses}`}
+    >
+      {isSelectable && (
+        <div className="absolute -inset-1 rounded-full bg-emerald-400/60 blur-[3px] animate-pulse pointer-events-none" />
+      )}
+
+      {/* Exact Teardrop Location Pin SVG with Center Alignment */}
+      <svg
+        viewBox="0 0 24 30"
+        className="w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 30 12 30C12 30 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
+          fill={main}
+          stroke={border}
+          strokeWidth="1.2"
+        />
+        {/* Hollow White Center Circle Head */}
+        <circle cx="12" cy="11" r="5" fill="#ffffff" />
+      </svg>
+    </div>
+  );
+};
+
+  // ---------- POLISHED HOME BASE YARD WITH RECESSED SOCKETS ----------
+  const renderBaseYard = (color: PlayerColor, gridClass: string) => {
+    const isCurrentTurn = currentTurn === color;
+    const isUserColor = color === userColor;
+    const canUnlock = hasRolled && diceVal === 6 && isCurrentTurn && isUserColor;
 
     return (
-      <div className={`relative flex flex-col items-center transition-all transform ${
-        isTraveling ? 'scale-125 -translate-y-2 animate-bounce z-30' : ''
-      } ${isSelectable ? 'ring-4 ring-amber-300 animate-pulse scale-110 cursor-pointer z-30' : ''}`}>
-        <svg
-          viewBox="0 0 24 28"
-          className="w-6 h-7 sm:w-7 sm:h-8 drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)]"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 28 12 28C12 28 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
-            fill={pinHex}
-            stroke="#ffffff"
-            strokeWidth="1.5"
-          />
-          <circle cx="12" cy="11" r="5" fill="#ffffff" />
-        </svg>
+      <div
+        className={`${gridClass} ${COLOR_THEME[color].base} p-2.5 sm:p-4 flex flex-col items-center justify-center transition-all ${
+          isCurrentTurn
+            ? 'shadow-[0_0_30px_rgba(255,255,255,0.8)] scale-[1.03] z-10 border-2 border-white'
+            : 'border-2 border-slate-900/40 opacity-95'
+        }`}
+      >
+        {/* Inner White Sockets Courtyard */}
+        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3 shadow-[inset_0_3px_8px_rgba(0,0,0,0.18)] border-2 border-slate-300/80 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3 items-center justify-items-center relative">
+          {tokens[color].map((t) => {
+            const inBase = t.position === -1;
+            const isSelectable = canUnlock && inBase;
+
+            return (
+              <div
+                key={t.id}
+                onClick={() => {
+                  if (inBase && isUserColor && isCurrentTurn && hasRolled && diceVal === 6) {
+                    handlePlayerTokenClick(t.id);
+                  }
+                }}
+                className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all ${
+                  isSelectable
+                    ? 'ring-4 ring-emerald-400 bg-emerald-50 scale-105 cursor-pointer shadow-lg animate-pulse'
+                    : 'bg-slate-200/90 shadow-[inset_0_3px_6px_rgba(0,0,0,0.2)] border border-slate-300'
+                }`}
+              >
+                {inBase ? (
+                  renderPawn(color, isSelectable, false, 'normal')
+                ) : (
+                  <div
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-40 shadow-inner"
+                    style={{ backgroundColor: PIN_COLOR_HEX[color].main }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -470,14 +708,22 @@ export default function LudoPage() {
       });
     });
 
+    const count = presentTokens.length;
+    const scaleFactor: 'normal' | 'medium' | 'small' =
+      count >= 3 ? 'small' : count === 2 ? 'medium' : 'normal';
+
     const isTravelPathSq = travelPath.some(([r, c]) => r === row && c === col);
 
     return (
       <>
         {isTravelPathSq && <div className="absolute inset-0 bg-amber-400/40 animate-pulse pointer-events-none"></div>}
 
-        {presentTokens.length > 0 && (
-          <div className="absolute inset-0 flex items-center justify-center space-x-0.5 z-20 pointer-events-none">
+        {count > 0 && (
+          <div
+            className={`absolute inset-0 flex items-center justify-center z-20 pointer-events-none ${
+              count > 1 ? 'grid grid-cols-2 grid-rows-2 p-0.5 gap-0.5' : ''
+            }`}
+          >
             {presentTokens.map((t, i) => {
               const isTraveling = travelingTokenId && travelingTokenId.color === t.color && travelingTokenId.id === t.id;
               const movable = hasRolled && currentTurn === userColor && getMovableTokens(userColor, diceVal).some((mt) => mt.id === t.id);
@@ -486,9 +732,9 @@ export default function LudoPage() {
                 <div
                   key={`${t.color}-${t.id}-${i}`}
                   onClick={() => t.color === userColor && handlePlayerTokenClick(t.id)}
-                  className="pointer-events-auto"
+                  className="pointer-events-auto flex items-center justify-center w-full h-full"
                 >
-                  {renderExactTeardropPinMarker(t.color, movable, !!isTraveling)}
+                  {renderPawn(t.color, movable, !!isTraveling, scaleFactor)}
                 </div>
               );
             })}
@@ -498,8 +744,32 @@ export default function LudoPage() {
     );
   };
 
+  // Decorative entry arrows on the outer track, matching the reference board's direction cues
+  const ENTRY_ARROWS: { row: number; col: number; color: PlayerColor; Icon: typeof ArrowUp }[] = [
+    { row: 1, col: 7, color: 'green', Icon: ArrowDown },
+    { row: 7, col: 15, color: 'yellow', Icon: ArrowLeft },
+    { row: 15, col: 9, color: 'blue', Icon: ArrowUp },
+    { row: 9, col: 1, color: 'red', Icon: ArrowRight },
+  ];
+
   return (
     <ProtectedRoute>
+      <style jsx global>{`
+        @keyframes diceRoll {
+          0% { transform: perspective(700px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1); }
+          25% { transform: perspective(700px) rotateX(200deg) rotateY(80deg) rotateZ(40deg) scale(1.12); }
+          50% { transform: perspective(700px) rotateX(380deg) rotateY(260deg) rotateZ(90deg) scale(0.94); }
+          75% { transform: perspective(700px) rotateX(560deg) rotateY(440deg) rotateZ(140deg) scale(1.1); }
+          100% { transform: perspective(700px) rotateX(720deg) rotateY(720deg) rotateZ(0deg) scale(1); }
+        }
+        .animate-dice-roll { animation: diceRoll 0.85s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+        @keyframes diceIdle {
+          0%, 100% { transform: perspective(700px) rotateX(10deg) rotateY(-12deg); }
+          50% { transform: perspective(700px) rotateX(14deg) rotateY(-6deg); }
+        }
+        .animate-dice-idle { animation: diceIdle 3.2s ease-in-out infinite; }
+      `}</style>
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
           href="/"
@@ -517,12 +787,12 @@ export default function LudoPage() {
         )}
 
         <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6">
-          
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Strategic Minimax & Priority Intelligence</span>
+                <Brain className="w-3.5 h-3.5" />
+                <span>Smart Online Opponent</span>
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                 Ludo Star Supreme
@@ -539,7 +809,7 @@ export default function LudoPage() {
 
           {!hasPaidEntry ? (
             <div className="text-center py-12 px-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-8">
-              
+
               <div className="max-w-md mx-auto space-y-2">
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">Select Game Mode & Color!</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -580,15 +850,7 @@ export default function LudoPage() {
                         userColor === color
                           ? 'ring-4 ring-amber-400 scale-105 border-white shadow-xl'
                           : 'opacity-70 hover:opacity-100'
-                      } ${
-                        color === 'red'
-                          ? 'bg-rose-600 text-white'
-                          : color === 'green'
-                          ? 'bg-emerald-600 text-white'
-                          : color === 'yellow'
-                          ? 'bg-amber-400 text-slate-950'
-                          : 'bg-sky-500 text-white'
-                      }`}
+                      } ${COLOR_THEME[color].base} ${COLOR_THEME[color].text}`}
                     >
                       <span>{color}</span>
                     </button>
@@ -605,80 +867,39 @@ export default function LudoPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
+
               {/* Board Canvas */}
               <div className="lg:col-span-8 flex flex-col items-center">
-                <div className="w-[320px] h-[320px] sm:w-[460px] sm:h-[460px] border-4 border-slate-900 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl grid grid-cols-15 grid-rows-15 bg-white dark:bg-slate-950 select-none relative">
-                  
-                  {/* RED BASE */}
-                  <div className={`col-span-6 row-span-6 bg-rose-600 p-3 sm:p-5 flex items-center justify-center border-b-2 border-r-2 border-slate-900 transition-all ${
-                    currentTurn === 'red' ? 'ring-4 ring-amber-400 shadow-2xl scale-[1.02] z-10' : ''
-                  }`}>
-                    <div className="w-full h-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-2 shadow-inner">
-                      {tokens.red.map((t) => (
-                        <button
-                          key={t.id}
-                          disabled={t.position !== -1 || currentTurn !== userColor || !hasRolled || diceVal !== 6}
-                          onClick={() => userColor === 'red' && handlePlayerTokenClick(t.id)}
-                          className="flex items-center justify-center"
-                        >
-                          {t.position === -1 && renderExactTeardropPinMarker('red', hasRolled && diceVal === 6 && userColor === 'red' && currentTurn === 'red')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div className="w-[320px] h-[320px] sm:w-[460px] sm:h-[460px] border-4 border-slate-900 rounded-3xl overflow-hidden shadow-2xl grid grid-cols-15 grid-rows-15 bg-[#fafafa] select-none relative">
 
-                  {/* GREEN BASE */}
-                  <div className={`col-start-10 col-span-6 row-span-6 bg-emerald-600 p-3 sm:p-5 flex items-center justify-center border-b-2 border-l-2 border-slate-900 transition-all ${
-                    currentTurn === 'green' ? 'ring-4 ring-amber-400 shadow-2xl scale-[1.02] z-10' : ''
-                  }`}>
-                    <div className="w-full h-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-2 shadow-inner">
-                      {tokens.green.map((t) => (
-                        <div key={t.id} className="flex items-center justify-center">
-                          {t.position === -1 && renderExactTeardropPinMarker('green')}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {/* RED BASE YARD */}
+                  {renderBaseYard('red', 'col-span-6 row-span-6 border-b-2 border-r-2 border-slate-900')}
 
-                  {/* BLUE BASE */}
-                  <div className={`row-start-10 col-span-6 row-span-6 bg-sky-500 p-3 sm:p-5 flex items-center justify-center border-t-2 border-r-2 border-slate-900 transition-all ${
-                    currentTurn === 'blue' ? 'ring-4 ring-amber-400 shadow-2xl scale-[1.02] z-10' : ''
-                  }`}>
-                    <div className="w-full h-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-2 shadow-inner">
-                      {tokens.blue.map((t) => (
-                        <div key={t.id} className="flex items-center justify-center">
-                          {t.position === -1 && renderExactTeardropPinMarker('blue')}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {/* GREEN BASE YARD */}
+                  {renderBaseYard('green', 'col-start-10 col-span-6 row-span-6 border-b-2 border-l-2 border-slate-900')}
 
-                  {/* YELLOW BASE */}
-                  <div className={`row-start-10 col-start-10 col-span-6 row-span-6 bg-amber-400 p-3 sm:p-5 flex items-center justify-center border-t-2 border-l-2 border-slate-900 transition-all ${
-                    currentTurn === 'yellow' ? 'ring-4 ring-amber-400 shadow-2xl scale-[1.02] z-10' : ''
-                  }`}>
-                    <div className="w-full h-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-2 shadow-inner">
-                      {tokens.yellow.map((t) => (
-                        <div key={t.id} className="flex items-center justify-center">
-                          {t.position === -1 && renderExactTeardropPinMarker('yellow')}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {/* BLUE BASE YARD */}
+                  {renderBaseYard('blue', 'row-start-10 col-span-6 row-span-6 border-t-2 border-r-2 border-slate-900')}
 
-                  {/* CENTER STAR HOME */}
-                  <div className="col-start-7 row-start-7 col-span-3 row-span-3 bg-amber-400 p-1 flex flex-col items-center justify-center text-slate-950 font-black text-xs border-2 border-slate-900 shadow-2xl z-10">
+                  {/* YELLOW BASE YARD */}
+                  {renderBaseYard('yellow', 'row-start-10 col-start-10 col-span-6 row-span-6 border-t-2 border-l-2 border-slate-900')}
+
+                  {/* CENTER HOME — four color wedges meeting in the middle, like the reference board */}
+                  <div
+                    className="col-start-7 row-start-7 col-span-3 row-span-3 flex flex-col items-center justify-center border-2 border-slate-900 shadow-2xl z-10 relative overflow-hidden"
+                    style={{
+                      background: 'conic-gradient(from -45deg, #16a34a 0deg 90deg, #f59e0b 90deg 180deg, #2563eb 180deg 270deg, #e11d48 270deg 360deg)',
+                    }}
+                  >
                     {winner ? (
-                      <div className="flex flex-col items-center animate-bounce">
+                      <div className="flex flex-col items-center animate-bounce bg-white/90 rounded-xl px-2 py-1">
                         <Crown className="w-7 h-7 text-amber-500 fill-current drop-shadow-md" />
                         <span className="text-[9px] font-black uppercase text-slate-950">WINNER</span>
                       </div>
                     ) : (
-                      <>
+                      <div className="flex flex-col items-center bg-white/85 rounded-full w-8 h-8 sm:w-10 sm:h-10 items-center justify-center shadow-lg">
                         <Sparkles className="w-5 h-5 text-slate-950 animate-bounce" />
-                        <span className="text-[10px]">HOME</span>
-                      </>
+                      </div>
                     )}
                   </div>
 
@@ -714,23 +935,31 @@ export default function LudoPage() {
                         (row === 9 && col === 3) ||
                         (row === 7 && col === 13);
 
+                      const arrow = ENTRY_ARROWS.find((a) => a.row === row && a.col === col);
+
                       return (
                         <div
                           key={`cell-${row}-${col}`}
-                          className={`relative border border-slate-300 dark:border-slate-800 flex items-center justify-center font-bold text-[9px] ${
+                          className={`relative border border-slate-300 dark:border-slate-300 flex items-center justify-center font-bold text-[9px] ${
                             isRedHomeStr || isRedStart
-                              ? 'bg-rose-600 text-white'
+                              ? `${COLOR_THEME.red.tile} text-white shadow-sm`
                               : isGreenHomeStr || isGreenStart
-                              ? 'bg-emerald-600 text-white'
+                              ? `${COLOR_THEME.green.tile} text-white shadow-sm`
                               : isYellowHomeStr || isYellowStart
-                              ? 'bg-amber-400 text-slate-950'
+                              ? `${COLOR_THEME.yellow.tile} text-slate-950 shadow-sm`
                               : isBlueHomeStr || isBlueStart
-                              ? 'bg-sky-500 text-white'
-                              : 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-500'
+                              ? `${COLOR_THEME.blue.tile} text-white shadow-sm`
+                              : 'bg-white text-slate-700 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]'
                           }`}
                           style={{ gridRowStart: row, gridColumnStart: col }}
                         >
                           {isStarCell && <Star className="w-3 h-3 text-amber-400 fill-current" />}
+                          {arrow && (
+                            <arrow.Icon
+                              className="w-3 h-3 opacity-90"
+                              style={{ color: arrow.color === 'yellow' ? '#78350f' : 'white' }}
+                            />
+                          )}
                           {renderCellTokens(row, col)}
                         </div>
                       );
@@ -740,10 +969,10 @@ export default function LudoPage() {
                 </div>
               </div>
 
-              {/* Controls Panel */}
+              {/* Controls Panel — dice stays here untouched in position/behavior, just restyled */}
               <div className="lg:col-span-4 space-y-6">
                 <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 space-y-6 text-center">
-                  
+
                   {winner ? (
                     <div className="p-4 rounded-2xl bg-emerald-500/20 text-emerald-500 font-extrabold text-base flex flex-col items-center justify-center space-y-1 animate-bounce">
                       <Crown className="w-8 h-8 text-amber-400 fill-current drop-shadow-md" />
@@ -767,9 +996,9 @@ export default function LudoPage() {
                     </div>
                   )}
 
-                  {/* Slower Photorealistic 3D Dice */}
+                  {/* Exact 3D Casino Dice (Same as Snake & Ladder) */}
                   <div className="flex justify-center my-4">
-                    {renderPhotorealistic3DDice(diceVal)}
+                    <Dice3D rotation={cubeRotation} rolling={isRolling} />
                   </div>
 
                   <button

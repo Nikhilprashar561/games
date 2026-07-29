@@ -31,11 +31,11 @@ export const HeroSection: React.FC = () => {
                 <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white text-xs font-bold px-4 py-2.5 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-700/60">
                   <span className="flex items-center space-x-1.5 text-emerald-400">
                     <Zap className="w-4 h-4" />
-                    <span>Live Instant Multiplayer</span>
+                    <span>Play Online Real-Time</span>
                   </span>
                   <span className="flex items-center space-x-1.5 text-amber-400">
                     <Trophy className="w-4 h-4" />
-                    <span>Play & Win Cash Coins</span>
+                    <span>Play & Win Real Rewards</span>
                   </span>
                 </div>
               </div>
@@ -45,7 +45,7 @@ export const HeroSection: React.FC = () => {
             <div className="lg:col-span-6 space-y-6 text-left">
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Next-Gen Gaming Hub</span>
+                <span>Play & Win Gaming Arena</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight font-['Space_Grotesk']">
@@ -56,7 +56,7 @@ export const HeroSection: React.FC = () => {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed font-normal">
-                Challenge players worldwide in Chess, Ludo, Snake & Ladder, Teen Patti, Carrom, and Number Predict! Jump into Tic-Tac-Toe completely free.
+                Challenge real players online in Chess, Ludo, Snake & Ladder, Teen Patti, Carrom, and Number Predict! Jump into Tic-Tac-Toe completely free.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
@@ -80,7 +80,7 @@ export const HeroSection: React.FC = () => {
               <div className="pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-xs font-bold text-slate-400">
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>Instant Rooms</span>
+                  <span>Instant Game Rooms</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -88,7 +88,7 @@ export const HeroSection: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>Fair Play Engine</span>
+                  <span>100% Fair Play</span>
                 </div>
               </div>
 

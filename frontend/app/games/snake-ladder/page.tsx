@@ -1,10 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, RotateCcw, ShieldCheck, Trophy, Wallet, Clock, Volume2, VolumeX, Users, Copy, Check, Zap } from 'lucide-react';
+import {
+  ArrowLeft,
+  RotateCcw,
+  ShieldCheck,
+  Trophy,
+  Wallet,
+  Clock,
+  Volume2,
+  VolumeX,
+  Users,
+  Copy,
+  Check,
+  Zap,
+  Flag,
+  Sparkles,
+  Skull,
+  AlertTriangle,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 
@@ -18,7 +35,7 @@ const LADDERS_MAP: Record<number, number> = {
   36: 44,
   51: 67,
   71: 91,
-  80: 100,
+  80: 96,
 };
 
 const SNAKES_MAP: Record<number, number> = {
@@ -43,10 +60,191 @@ const getCellCoords = (cellNum: number): [number, number] => {
   return [row, col];
 };
 
+/* ============================================================================
+ * REAL 3D DICE — an actual six-face cube built from CSS, rotated with
+ * rotateX/rotateY so the correct face is genuinely facing the viewer
+ * (not a flat sprite swap). Opposite faces sum to 7, like a real die.
+ * ==========================================================================*/
+const FACE_ROTATIONS: Record<number, { x: number; y: number }> = {
+  1: { x: -90, y: 0 },
+  2: { x: 0, y: 0 },
+  3: { x: 0, y: -90 },
+  4: { x: 0, y: 90 },
+  5: { x: 0, y: 180 },
+  6: { x: 90, y: 0 },
+};
+
+const PIP_LAYOUTS: Record<number, [number, number][]> = {
+  1: [[50, 50]],
+  2: [
+    [26, 26],
+    [74, 74],
+  ],
+  3: [
+    [26, 26],
+    [50, 50],
+    [74, 74],
+  ],
+  4: [
+    [26, 26],
+    [74, 26],
+    [26, 74],
+    [74, 74],
+  ],
+  5: [
+    [26, 26],
+    [74, 26],
+    [50, 50],
+    [26, 74],
+    [74, 74],
+  ],
+  6: [
+    [26, 22],
+    [74, 22],
+    [26, 50],
+    [74, 50],
+    [26, 78],
+    [74, 78],
+  ],
+};
+
+const DICE_SIZE = 64; // px
+const DICE_HALF = DICE_SIZE / 2;
+
+function DiceFace({ value, transform }: { value: number; transform: string }) {
+  return (
+    <div
+      className="absolute inset-0 rounded-xl bg-gradient-to-br from-white to-slate-200 border border-slate-300 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.15)]"
+      style={{ transform, backfaceVisibility: 'hidden' }}
+    >
+      {PIP_LAYOUTS[value].map(([px, py], idx) => (
+        <span
+          key={idx}
+          className={`absolute w-[9px] h-[9px] rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.5)] ${
+            value === 1 ? 'bg-rose-600' : 'bg-slate-900'
+          }`}
+          style={{ left: `${px}%`, top: `${py}%`, transform: 'translate(-50%,-50%)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rolling: boolean }) {
+  return (
+    <div className="flex flex-col items-center" style={{ perspective: '700px' }}>
+      <div
+        className="relative"
+        style={{
+          width: DICE_SIZE,
+          height: DICE_SIZE,
+          transformStyle: 'preserve-3d',
+          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+          transition: 'transform 1.8s cubic-bezier(0.15, 0.85, 0.35, 1)',
+        }}
+      >
+        <DiceFace value={2} transform={`rotateY(0deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={5} transform={`rotateY(180deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={3} transform={`rotateY(90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={4} transform={`rotateY(-90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={1} transform={`rotateX(90deg) translateZ(${DICE_HALF}px)`} />
+        <DiceFace value={6} transform={`rotateX(-90deg) translateZ(${DICE_HALF}px)`} />
+      </div>
+      <div
+        className="mt-3 rounded-full bg-black/40 blur-[2px] transition-all duration-300"
+        style={{ width: rolling ? 30 : 42, height: 8, opacity: rolling ? 0.25 : 0.4 }}
+      />
+    </div>
+  );
+}
+
+/* ============================================================================
+ * GAME PAWN — a glossy pin-style token instead of a stacked-div "pawn",
+ * anchored by its tip to the cell so it visually "stands" on the board.
+ * ==========================================================================*/
+type PawnTheme = 'player' | 'opponent';
+
+const PAWN_COLORS: Record<PawnTheme, { grad: [string, string, string]; ring: string; badge: string }> = {
+  player: { grad: ['#6ee7b7', '#10b981', '#065f46'], ring: 'rgba(16,185,129,0.55)', badge: 'border-emerald-400 text-emerald-300' },
+  opponent: { grad: ['#fde68a', '#f59e0b', '#92400e'], ring: 'rgba(245,158,11,0.55)', badge: 'border-amber-400 text-amber-300' },
+};
+
+function GamePawn({
+  cellNum,
+  theme,
+  name,
+  active,
+  traveling,
+}: {
+  cellNum: number;
+  theme: PawnTheme;
+  name: string;
+  active: boolean;
+  traveling: boolean;
+}) {
+  const [row, col] = getCellCoords(cellNum);
+  const left = (col - 0.5) * 10;
+  const top = (row - 0.5) * 10;
+  const c = PAWN_COLORS[theme];
+  const gradId = `pawnGrad-${theme}`;
+  const initial = (name || '?').charAt(0).toUpperCase();
+
+  return (
+    <div
+      className={`absolute pointer-events-none z-40 flex flex-col items-center transition-all duration-300 ${
+        traveling ? 'animate-pawn-hop' : ''
+      }`}
+      style={{
+        left: `${left}%`,
+        top: `${top}%`,
+        transform: `translate(-50%, -100%) scale(${active ? 1.12 : 1})`,
+      }}
+    >
+      <div className={`mb-1 px-2 py-0.5 rounded-full bg-slate-950/95 font-black text-[9px] sm:text-[10px] whitespace-nowrap border shadow-lg ${c.badge}`}>
+        {name}
+      </div>
+
+      <div className="relative" style={{ width: 26, height: 34 }}>
+        {active && (
+          <div
+            className="absolute -inset-1.5 rounded-full blur-md animate-pulse"
+            style={{ background: c.ring }}
+          />
+        )}
+        <svg width="26" height="34" viewBox="0 0 26 34" className="relative drop-shadow-[0_6px_6px_rgba(0,0,0,0.5)]">
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={c.grad[0]} />
+              <stop offset="55%" stopColor={c.grad[1]} />
+              <stop offset="100%" stopColor={c.grad[2]} />
+            </linearGradient>
+          </defs>
+          <path
+            d="M13 0C5.8 0 0 5.8 0 13c0 9 13 21 13 21s13-12 13-21C26 5.8 20.2 0 13 0Z"
+            fill={`url(#${gradId})`}
+            stroke="rgba(255,255,255,0.6)"
+            strokeWidth="0.8"
+          />
+          <circle cx="13" cy="13" r="7.5" fill="rgba(255,255,255,0.18)" />
+          <circle cx="10.5" cy="10.5" r="2.2" fill="rgba(255,255,255,0.75)" />
+          <text x="13" y="16.5" textAnchor="middle" fontSize="9" fontWeight="800" fill="#0b1520">
+            {initial}
+          </text>
+        </svg>
+      </div>
+      <div
+        className="rounded-full blur-[1.5px]"
+        style={{ width: 14, height: 4, marginTop: -2, background: 'rgba(0,0,0,0.45)' }}
+      />
+    </div>
+  );
+}
+
 export default function SnakeLadderPage() {
   const { user, updateWalletBalance, recordGameMatch } = useAuth();
   const ENTRY_COST = 10;
   const WIN_REWARD = 18;
+  const DICE_SPIN_MS = 1800;
 
   const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
   const [roomCode, setRoomCode] = useState<string>('SNAKE-8842');
@@ -58,13 +256,50 @@ export default function SnakeLadderPage() {
 
   const [turn, setTurn] = useState<'player' | 'opponent'>('player');
   const [diceVal, setDiceVal] = useState<number>(6);
+  const [cubeRotation, setCubeRotation] = useState<{ x: number; y: number }>(() => ({ ...FACE_ROTATIONS[6] }));
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [isOpponentThinking, setIsOpponentThinking] = useState<boolean>(false);
   const [winner, setWinner] = useState<string | null>(null);
 
-  const [eventBanner, setEventBanner] = useState<{ type: 'snake' | 'ladder' | 'win'; message: string } | null>(null);
+  const [eventBanner, setEventBanner] = useState<{ type: 'snake' | 'ladder' | 'win' | 'bonus' | 'forfeit'; message: string } | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [travelingPlayer, setTravelingPlayer] = useState<'player' | 'opponent' | null>(null);
+
+  // Consecutive-6 tracking (industry-standard bonus-roll rule, see rollDice/opponentAutoTurn).
+  // Refs, not state, because they must be read/updated synchronously between rolls.
+  const playerSixStreakRef = useRef(0);
+  const opponentSixStreakRef = useRef(0);
+  const aiTurnTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Synchronous position refs to prevent stale closure bugs on consecutive rolls
+  const playerPosRef = useRef(1);
+  const opponentPosRef = useRef(1);
+
+  const updatePlayerPosition = (pos: number) => {
+    playerPosRef.current = pos;
+    setPlayerPos(pos);
+  };
+
+  const updateOpponentPosition = (pos: number) => {
+    opponentPosRef.current = pos;
+    setOpponentPos(pos);
+  };
+
+  // How long the AI "thinks" before rolling — randomized so it doesn't feel
+  // like a metronome, with a touch more hesitation when it's close to winning.
+  const aiThinkDelay = (pos: number) => {
+    const base = 900 + Math.random() * 1100;
+    const nervousness = pos >= 90 ? 400 + Math.random() * 400 : 0;
+    return base + nervousness;
+  };
+
+  const scheduleOpponentTurn = () => {
+    setIsOpponentThinking(true);
+    if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
+    aiTurnTimeoutRef.current = setTimeout(() => {
+      opponentAutoTurn();
+    }, aiThinkDelay(opponentPos));
+  };
 
   // Sound Synthesizer
   const playSound = (type: 'roll' | 'step' | 'ladder' | 'snake' | 'win') => {
@@ -128,12 +363,16 @@ export default function SnakeLadderPage() {
       alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Snake & Ladder.`);
       return;
     }
+    if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
+    playerSixStreakRef.current = 0;
+    opponentSixStreakRef.current = 0;
     await updateWalletBalance(-ENTRY_COST);
     setHasPaidEntry(true);
-    setPlayerPos(1);
-    setOpponentPos(1);
+    updatePlayerPosition(1);
+    updateOpponentPosition(1);
     setOpponentName(getRandomOpponentName());
     setDiceVal(6);
+    setCubeRotation({ ...FACE_ROTATIONS[6] });
     setTurn('player');
     setIsOpponentThinking(false);
     setWinner(null);
@@ -141,55 +380,108 @@ export default function SnakeLadderPage() {
     setTravelingPlayer(null);
   };
 
+  // Triggers only on the player->opponent transition. Bonus (rolled-a-6)
+  // continuations while turn stays 'opponent' are scheduled directly from
+  // checkOpponentWin instead, since a same-value state change won't re-fire this.
   useEffect(() => {
     if (!hasPaidEntry || winner) return;
-
     if (turn === 'opponent') {
-      setIsOpponentThinking(true);
-      const timer = setTimeout(() => {
-        opponentAutoTurn();
-      }, 2000);
-      return () => clearTimeout(timer);
+      scheduleOpponentTurn();
     }
+    return () => {
+      if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, hasPaidEntry, winner]);
 
-  const opponentAutoTurn = () => {
-    setIsRolling(true);
-    playSound('roll');
-    let count = 0;
-    const interval = setInterval(() => {
-      setDiceVal(Math.floor(Math.random() * 6) + 1);
-      count++;
-      if (count >= 10) {
-        clearInterval(interval);
-        const finalRoll = Math.floor(Math.random() * 6) + 1;
-        setDiceVal(finalRoll);
-        setIsRolling(false);
-        processOpponentStep(finalRoll);
-      }
-    }, 100);
+  useEffect(() => {
+    return () => {
+      if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
+    };
+  }, []);
+
+  // A short "processing" pause between the dice settling and the token
+  // actually setting off — real players don't move the instant the die stops.
+  const MOVE_START_DELAY = 380;
+  // Per-cell hop timing gets a little jitter so movement doesn't feel metronomic.
+  const nextStepDelay = () => 230 + Math.random() * 110;
+
+  // Spins the cube forward (never backward, so the animation always tumbles
+  // convincingly) and lands it precisely on `value`.
+  const spinCubeTo = (value: number) => {
+    setCubeRotation((prev) => {
+      const normX = ((prev.x % 360) + 360) % 360;
+      const normY = ((prev.y % 360) + 360) % 360;
+      const target = FACE_ROTATIONS[value];
+      return {
+        x: prev.x - normX + 1440 + target.x,
+        y: prev.y - normY + 2160 + target.y,
+      };
+    });
   };
 
-  // Parabolic Hop Movement Flow (300ms step latency)
-  const processOpponentStep = (roll: number) => {
-    const startCell = opponentPos;
+  const opponentAutoTurn = () => {
+    const finalRoll = Math.floor(Math.random() * 6) + 1;
+    setIsRolling(true);
+    playSound('roll');
+    spinCubeTo(finalRoll);
+    setTimeout(() => {
+      setDiceVal(finalRoll);
+      setIsRolling(false);
+      // Brief pause before the piece actually sets off, like a player
+      // registering the result before moving their token.
+      setTimeout(() => resolveOpponentRoll(finalRoll), MOVE_START_DELAY);
+    }, DICE_SPIN_MS);
+  };
+
+  // Industry-standard six-streak rule: a 6 earns a bonus roll, but three 6s
+  // in a row forfeits the move entirely (prevents an infinite bonus chain).
+  const resolveOpponentRoll = (roll: number) => {
+    let bonus = false;
+    if (roll === 6) {
+      opponentSixStreakRef.current += 1;
+      if (opponentSixStreakRef.current >= 3) {
+        opponentSixStreakRef.current = 0;
+        setEventBanner({ type: 'forfeit', message: `${opponentName} rolled three 6s in a row — move forfeited!` });
+        setTimeout(() => {
+          setEventBanner(null);
+          setIsOpponentThinking(false);
+          setTurn('player');
+        }, 900);
+        return;
+      }
+      bonus = true;
+    } else {
+      opponentSixStreakRef.current = 0;
+    }
+    processOpponentStep(roll, bonus);
+  };
+
+  // Jittered hop movement — each cell takes a slightly different amount of
+  // time to cross, so the token doesn't glide with robotic precision.
+  const processOpponentStep = (roll: number, bonus: boolean) => {
+    const startCell = opponentPosRef.current;
     const targetCell = startCell + roll;
 
     if (targetCell > 100) {
       setIsOpponentThinking(false);
-      setTurn('player');
+      if (bonus) {
+        setEventBanner({ type: 'bonus', message: `${opponentName} rolled a 6 — bonus roll!` });
+        setTimeout(() => setEventBanner(null), 800);
+        scheduleOpponentTurn();
+      } else {
+        setTurn('player');
+      }
       return;
     }
 
     setTravelingPlayer('opponent');
     let cur = startCell;
-    const stepTimer = setInterval(() => {
+    const hop = () => {
       cur += 1;
-      setOpponentPos(cur);
+      updateOpponentPosition(cur);
       playSound('step');
-
       if (cur >= targetCell) {
-        clearInterval(stepTimer);
         setTravelingPlayer(null);
 
         if (LADDERS_MAP[targetCell]) {
@@ -197,32 +489,39 @@ export default function SnakeLadderPage() {
           playSound('ladder');
           setEventBanner({ type: 'ladder', message: `${opponentName} climbed a Ladder to cell ${ladderTop}! 🪜` });
           setTimeout(() => {
-            setOpponentPos(ladderTop);
+            updateOpponentPosition(ladderTop);
             setEventBanner(null);
-            checkOpponentWin(ladderTop);
+            checkOpponentWin(ladderTop, bonus);
           }, 900);
         } else if (SNAKES_MAP[targetCell]) {
           const snakeTail = SNAKES_MAP[targetCell];
           playSound('snake');
           setEventBanner({ type: 'snake', message: `${opponentName} got bitten by a Snake to cell ${snakeTail}! 🐍` });
           setTimeout(() => {
-            setOpponentPos(snakeTail);
+            updateOpponentPosition(snakeTail);
             setEventBanner(null);
-            checkOpponentWin(snakeTail);
+            checkOpponentWin(snakeTail, bonus);
           }, 900);
         } else {
-          checkOpponentWin(targetCell);
+          checkOpponentWin(targetCell, bonus);
         }
+      } else {
+        setTimeout(hop, nextStepDelay());
       }
-    }, 300);
+    };
+    setTimeout(hop, nextStepDelay());
   };
 
-  const checkOpponentWin = (finalPos: number) => {
+  const checkOpponentWin = (finalPos: number, bonus: boolean) => {
     setIsOpponentThinking(false);
     if (finalPos === 100) {
       setWinner(opponentName);
       playSound('win');
       recordGameMatch('snake-ladder', 'Snake & Ladder Supreme', 'LOSS', ENTRY_COST, 0, opponentName);
+    } else if (bonus) {
+      setEventBanner({ type: 'bonus', message: `${opponentName} rolled a 6 — bonus roll!` });
+      setTimeout(() => setEventBanner(null), 800);
+      scheduleOpponentTurn();
     } else {
       setTurn('player');
     }
@@ -230,42 +529,62 @@ export default function SnakeLadderPage() {
 
   const rollDice = () => {
     if (isRolling || isOpponentThinking || turn !== 'player' || !!winner) return;
-
+    const finalRoll = Math.floor(Math.random() * 6) + 1;
     setIsRolling(true);
     playSound('roll');
-    let count = 0;
-    const interval = setInterval(() => {
-      setDiceVal(Math.floor(Math.random() * 6) + 1);
-      count++;
-      if (count >= 10) {
-        clearInterval(interval);
-        const finalRoll = Math.floor(Math.random() * 6) + 1;
-        setDiceVal(finalRoll);
-        setIsRolling(false);
-        processPlayerStep(finalRoll);
+    spinCubeTo(finalRoll);
+    setTimeout(() => {
+      setDiceVal(finalRoll);
+      setIsRolling(false);
+      setTimeout(() => resolvePlayerRoll(finalRoll), MOVE_START_DELAY);
+    }, DICE_SPIN_MS);
+  };
+
+  const resolvePlayerRoll = (roll: number) => {
+    let bonus = false;
+    if (roll === 6) {
+      playerSixStreakRef.current += 1;
+      if (playerSixStreakRef.current >= 3) {
+        playerSixStreakRef.current = 0;
+        setEventBanner({ type: 'forfeit', message: 'Three 6s in a row — move forfeited!' });
+        setTimeout(() => {
+          setEventBanner(null);
+          setTurn('opponent');
+        }, 900);
+        return;
       }
-    }, 100);
+      bonus = true;
+    } else {
+      playerSixStreakRef.current = 0;
+    }
+    processPlayerStep(roll, bonus);
   };
 
   // Parabolic Hop Movement Flow (300ms step latency)
-  const processPlayerStep = (roll: number) => {
-    const startCell = playerPos;
+  const processPlayerStep = (roll: number, bonus: boolean) => {
+    const startCell = playerPosRef.current;
     const targetCell = startCell + roll;
 
     if (targetCell > 100) {
-      setTurn('opponent');
+      // Overshoot: the move is void (exact count required to finish), but a
+      // 6 still earns its bonus roll regardless of whether the move landed.
+      if (bonus) {
+        setEventBanner({ type: 'bonus', message: 'Rolled a 6 — bonus roll! Roll again.' });
+        setTimeout(() => setEventBanner(null), 800);
+      } else {
+        setTurn('opponent');
+      }
       return;
     }
 
     setTravelingPlayer('player');
     let cur = startCell;
-    const stepTimer = setInterval(() => {
+    const hop = () => {
       cur += 1;
-      setPlayerPos(cur);
+      updatePlayerPosition(cur);
       playSound('step');
 
       if (cur >= targetCell) {
-        clearInterval(stepTimer);
         setTravelingPlayer(null);
 
         if (LADDERS_MAP[targetCell]) {
@@ -273,27 +592,30 @@ export default function SnakeLadderPage() {
           playSound('ladder');
           setEventBanner({ type: 'ladder', message: `GREAT MOVE! Climbed a Ladder to cell ${ladderTop}! 🪜` });
           setTimeout(() => {
-            setPlayerPos(ladderTop);
+            updatePlayerPosition(ladderTop);
             setEventBanner(null);
-            checkPlayerWin(ladderTop);
+            checkPlayerWin(ladderTop, bonus);
           }, 900);
         } else if (SNAKES_MAP[targetCell]) {
           const snakeTail = SNAKES_MAP[targetCell];
           playSound('snake');
           setEventBanner({ type: 'snake', message: `OOPS! Bitten by a Snake to cell ${snakeTail}! 🐍` });
           setTimeout(() => {
-            setPlayerPos(snakeTail);
+            updatePlayerPosition(snakeTail);
             setEventBanner(null);
-            checkPlayerWin(snakeTail);
+            checkPlayerWin(snakeTail, bonus);
           }, 900);
         } else {
-          checkPlayerWin(targetCell);
+          checkPlayerWin(targetCell, bonus);
         }
+      } else {
+        setTimeout(hop, nextStepDelay());
       }
-    }, 300);
+    };
+    setTimeout(hop, nextStepDelay());
   };
 
-  const checkPlayerWin = async (finalPos: number) => {
+  const checkPlayerWin = async (finalPos: number, bonus: boolean) => {
     if (finalPos === 100) {
       const winnerName = user?.name || 'Player';
       setWinner(winnerName);
@@ -301,6 +623,10 @@ export default function SnakeLadderPage() {
       await updateWalletBalance(WIN_REWARD);
       await recordGameMatch('snake-ladder', 'Snake & Ladder Supreme', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
       confetti({ particleCount: 150, spread: 90 });
+    } else if (bonus) {
+      setEventBanner({ type: 'bonus', message: 'Rolled a 6 — bonus roll! Roll again.' });
+      setTimeout(() => setEventBanner(null), 800);
+      // turn stays 'player' — the Roll button re-enables automatically
     } else {
       setTurn('opponent');
     }
@@ -310,37 +636,6 @@ export default function SnakeLadderPage() {
     navigator.clipboard.writeText(roomCode);
     setCopiedRoomCode(true);
     setTimeout(() => setCopiedRoomCode(false), 2000);
-  };
-
-  const render3DCasinoDice = (value: number) => {
-    const dotPositions: Record<number, string[]> = {
-      1: ['col-start-2 row-start-2'],
-      2: ['col-start-1 row-start-1', 'col-start-3 row-start-3'],
-      3: ['col-start-1 row-start-1', 'col-start-2 row-start-2', 'col-start-3 row-start-3'],
-      4: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-1 row-start-3', 'col-start-3 row-start-3'],
-      5: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3'],
-      6: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3'],
-    };
-
-    return (
-      <div
-        className={`relative w-24 h-24 rounded-[26px] bg-gradient-to-br from-white via-slate-100 to-slate-300 border-4 border-slate-300 shadow-[0_15px_30px_rgba(0,0,0,0.4)] p-3 grid grid-cols-3 grid-rows-3 gap-1 items-center justify-items-center transition-all transform duration-500 ${
-          isRolling ? 'rotate-[720deg] scale-110 animate-spin' : 'hover:scale-105'
-        }`}
-        style={{
-          transform: isRolling
-            ? 'rotateX(720deg) rotateY(720deg) scale(1.1)'
-            : 'perspective(600px) rotateX(12deg) rotateY(-12deg)',
-        }}
-      >
-        {(dotPositions[value] || dotPositions[6]).map((posClass, idx) => (
-          <div
-            key={idx}
-            className={`w-4 h-4 rounded-full bg-slate-950 shadow-[inset_0_3px_6px_rgba(0,0,0,0.9)] ${posClass}`}
-          ></div>
-        ))}
-      </div>
-    );
   };
 
   // REALISTIC 3D WOODEN LADDER ENGINE (Depth Gradient Rails + Metallic Brackets + Textured Rungs)
@@ -367,7 +662,7 @@ export default function SnakeLadderPage() {
         {/* 3D Drop Shadow */}
         <line x1={x1 - 1.2} y1={y1 + 1.2} x2={x2 - 1.2} y2={y2 + 1.2} stroke="rgba(0,0,0,0.4)" strokeWidth="3" strokeLinecap="round" />
         <line x1={x1 + 1.2} y1={y1 + 1.2} x2={x2 + 1.2} y2={y2 + 1.2} stroke="rgba(0,0,0,0.4)" strokeWidth="3" strokeLinecap="round" />
-        
+
         {/* 3D Wooden Rails with Gradient Tone */}
         <line x1={x1 - 1.4} y1={y1} x2={x2 - 1.4} y2={y2} stroke="#5c2c06" strokeWidth="2.8" strokeLinecap="round" />
         <line x1={x1 - 1.0} y1={y1} x2={x2 - 1.0} y2={y2} stroke="#a75d1d" strokeWidth="1.6" strokeLinecap="round" />
@@ -409,13 +704,13 @@ export default function SnakeLadderPage() {
       <g key={key}>
         {/* Real 3D Drop Shadow */}
         <path d={pathD} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="5" strokeLinecap="round" transform="translate(0.8, 1)" />
-        
+
         {/* Tapered Outer Dark Emerald Python Spine */}
         <path d={pathD} fill="none" stroke="#064e3b" strokeWidth="4.2" strokeLinecap="round" />
-        
+
         {/* Vibrant Emerald Main Body */}
         <path d={pathD} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-        
+
         {/* Diamond Python Skin Pattern */}
         <path d={pathD} fill="none" stroke="#fbbf24" strokeWidth="1.6" strokeLinecap="round" strokeDasharray="2.5 2.5" />
         <path d={pathD} fill="none" stroke="#34d399" strokeWidth="0.8" strokeLinecap="round" strokeDasharray="1 3" />
@@ -424,11 +719,11 @@ export default function SnakeLadderPage() {
         <g transform={`translate(${x1}, ${y1})`}>
           {/* Red Flicking Tongue */}
           <path d="M 0 0 L -0.5 -2.5 M 0 0 L 0.5 -2.5" stroke="#ef4444" strokeWidth="0.6" fill="none" />
-          
+
           {/* Cobra Head Oval */}
           <ellipse cx="0" cy="0" rx="2.5" ry="2.8" fill="#047857" stroke="#ffffff" strokeWidth="0.6" />
           <ellipse cx="0" cy="0" rx="1.8" ry="2.0" fill="#065f46" />
-          
+
           {/* Eyes with Slit Pupils */}
           <circle cx="-1.0" cy="-0.8" r="0.6" fill="#fbbf24" />
           <circle cx="-1.0" cy="-0.8" r="0.3" fill="#000000" />
@@ -437,49 +732,6 @@ export default function SnakeLadderPage() {
           <circle cx="1.0" cy="-0.8" r="0.3" fill="#000000" />
         </g>
       </g>
-    );
-  };
-
-  // REALISTIC 3D PHYSICAL GAME PAWN PIECE (Sphere Head + Neck Ring + Weighted Base + Aura Ring!)
-  const renderTopOverlay3DPawn = (cellNum: number, color: 'red' | 'blue', name: string, isTraveling: boolean) => {
-    const [row, col] = getCellCoords(cellNum);
-
-    const leftPercent = (col - 0.5) * 10;
-    const topPercent = (row - 0.5) * 10;
-
-    const baseBg = color === 'red' ? 'from-rose-500 via-rose-600 to-rose-900 border-rose-300' : 'from-sky-400 via-sky-500 to-sky-800 border-sky-200';
-    const badgeColor = color === 'red' ? 'border-rose-400 text-rose-300' : 'border-sky-400 text-sky-300';
-
-    return (
-      <div
-        key={`pawn-${color}`}
-        className={`absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-50 ${
-          isTraveling ? 'scale-125 -translate-y-7 animate-bounce' : ''
-        }`}
-        style={{ left: `${leftPercent}%`, top: `${topPercent}%` }}
-      >
-        {/* Floating Tooltip Name Badge */}
-        <div className={`mb-1 px-2.5 py-0.5 rounded-full bg-slate-950/95 font-black text-[9px] sm:text-[10px] whitespace-nowrap border-2 shadow-[0_10px_25px_rgba(0,0,0,0.9)] ${badgeColor}`}>
-          {name}
-        </div>
-
-        {/* 3D Physical Game Pawn Piece */}
-        <div className="relative flex flex-col items-center group">
-          {/* Active Turn Pulsing Aura Ring */}
-          <div className={`absolute -inset-1 rounded-full blur-sm animate-pulse ${color === 'red' ? 'bg-rose-500/50' : 'bg-sky-400/50'}`}></div>
-
-          {/* 3D Pawn Sphere Head */}
-          <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br ${baseBg} border-2 shadow-2xl relative flex items-center justify-center z-20`}>
-            <div className="w-1.5 h-1.5 rounded-full bg-white/80 absolute top-1 left-1"></div>
-          </div>
-
-          {/* 3D Pawn Neck Ring */}
-          <div className="w-3.5 h-1 bg-slate-900 border-x border-white/40 -mt-0.5 z-10"></div>
-
-          {/* 3D Pawn Pedestal Base */}
-          <div className={`w-6 h-3 sm:w-7 sm:h-3.5 rounded-b-xl bg-gradient-to-b ${baseBg} border-t-2 border-white/60 shadow-[0_8px_16px_rgba(0,0,0,0.8)] -mt-0.5 z-0`}></div>
-        </div>
-      </div>
     );
   };
 
@@ -495,23 +747,34 @@ export default function SnakeLadderPage() {
         </Link>
 
         {eventBanner && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900/90 text-white font-extrabold text-sm border border-amber-400/50 shadow-2xl animate-bounce flex items-center space-x-2">
-            <Zap className="w-5 h-5 text-amber-400" />
+          <div
+            className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900/90 text-white font-extrabold text-sm border shadow-2xl animate-bounce flex items-center space-x-2 ${
+              eventBanner.type === 'forfeit'
+                ? 'border-rose-400/50'
+                : eventBanner.type === 'bonus'
+                ? 'border-emerald-400/50'
+                : 'border-amber-400/50'
+            }`}
+          >
+            {eventBanner.type === 'forfeit' ? (
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+            ) : eventBanner.type === 'bonus' ? (
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+            ) : (
+              <Zap className="w-5 h-5 text-amber-400" />
+            )}
             <span>{eventBanner.message}</span>
           </div>
         )}
 
         <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6">
-          
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>3D Physical Pawns & Cobra Snakes Engine</span>
+                <span>Live 3D Dice Game</span>
               </div>
-              <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
-                Snake & Ladder Supreme
-              </h1>
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">Snake & Ladder Supreme</h1>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -538,7 +801,7 @@ export default function SnakeLadderPage() {
               <div className="max-w-md mx-auto space-y-2">
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">Race to Cell 100!</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Pay ₹10 entry to challenge online player <span className="font-bold text-emerald-500">{opponentName}</span>. First to reach cell 100 wins ₹18!
+                  Pay ₹10 entry to challenge <span className="font-bold text-emerald-500">{opponentName}</span>. First to reach cell 100 wins ₹18!
                 </p>
               </div>
 
@@ -559,65 +822,64 @@ export default function SnakeLadderPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
               {/* 100-Tile Board Canvas */}
               <div className="lg:col-span-8 flex flex-col items-center">
-                <div className="relative w-[320px] h-[320px] sm:w-[460px] sm:h-[460px] border-4 border-slate-900 rounded-3xl shadow-2xl bg-slate-950 select-none">
-                  
-                  {/* LAYER 1: CLEAN 100-TILE BOARD GRID (z-0) */}
-                  <div className="w-full h-full grid grid-cols-10 grid-rows-10 rounded-3xl overflow-hidden">
-                    {Array.from({ length: 100 }, (_, i) => {
-                      const cellNum = 100 - i;
-                      const [row, col] = getCellCoords(cellNum);
+                <div className="relative w-[320px] h-[320px] sm:w-[460px] sm:h-[460px] p-2 sm:p-3 rounded-[28px] shadow-2xl select-none bg-gradient-to-br from-[#7a4a24] to-[#4a2c14]">
+                  <div className="relative w-full h-full rounded-2xl overflow-hidden border border-black/30">
+                    {/* LAYER 1: WOOD & CREAM 100-TILE BOARD GRID (z-0) */}
+                    <div className="w-full h-full grid grid-cols-10 grid-rows-10">
+                      {Array.from({ length: 100 }, (_, i) => {
+                        const cellNum = 100 - i;
+                        const [row, col] = getCellCoords(cellNum);
+                        const isLight = (row + col) % 2 === 0;
+                        const isLadderStart = LADDERS_MAP[cellNum] !== undefined;
+                        const isSnakeHead = SNAKES_MAP[cellNum] !== undefined;
+                        const isStart = cellNum === 1;
+                        const isFinish = cellNum === 100;
 
-                      const colorIndex = (row + col) % 4;
-                      const tileBg =
-                        colorIndex === 0
-                          ? 'bg-amber-400 text-slate-950'
-                          : colorIndex === 1
-                          ? 'bg-rose-600 text-white'
-                          : colorIndex === 2
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-sky-500 text-white';
+                        let tileBg = isLight ? 'bg-[#f1dcae]' : 'bg-[#e2c48a]';
+                        if (isLadderStart) tileBg = isLight ? 'bg-[#cdeede]' : 'bg-[#b9e4cc]';
+                        if (isSnakeHead) tileBg = isLight ? 'bg-[#f6d2ce]' : 'bg-[#f0bcb6]';
+                        if (isFinish) tileBg = 'bg-gradient-to-br from-amber-300 to-amber-500';
 
-                      return (
-                        <div
-                          key={cellNum}
-                          className={`relative border border-slate-900/60 flex flex-col items-center justify-between p-1 font-extrabold text-[10px] sm:text-xs ${tileBg}`}
-                          style={{ gridRowStart: row, gridColumnStart: col }}
-                        >
-                          <span className="self-start text-[9px] font-black opacity-80">{cellNum}</span>
-                        </div>
-                      );
-                    })}
+                        return (
+                          <div
+                            key={cellNum}
+                            className={`relative border border-black/10 flex items-start justify-start p-0.5 sm:p-1 ${tileBg} shadow-[inset_0_0_4px_rgba(0,0,0,0.15)]`}
+                            style={{ gridRowStart: row, gridColumnStart: col }}
+                          >
+                            <span className="text-[7px] sm:text-[9px] font-black text-[#5c3a1e]/70 leading-none">{cellNum}</span>
+                            {isLadderStart && <Sparkles className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 text-emerald-700/70" />}
+                            {isSnakeHead && <Skull className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 text-rose-800/70" />}
+                            {isStart && (
+                              <span className="absolute bottom-0.5 left-0.5 text-[6px] sm:text-[7px] font-black text-emerald-800 tracking-wide">
+                                START
+                              </span>
+                            )}
+                            {isFinish && <Flag className="absolute bottom-0.5 right-0.5 w-3 h-3 text-amber-900" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* LAYER 2: VISUAL SVG OVERLAY CANVAS FOR SNAKES & LADDERS (z-10) */}
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+                      {Object.entries(LADDERS_MAP).map(([start, end]) => renderSVGLadder(Number(start), Number(end), `ladder-${start}`))}
+                      {Object.entries(SNAKES_MAP).map(([head, tail]) => renderSVGSnake(Number(head), Number(tail), `snake-${head}`))}
+                    </svg>
+
+                    {/* LAYER 3: PIN-STYLE GAME PAWNS (z-40 -> ALWAYS ON TOP) */}
+                    <div className="absolute inset-0 w-full h-full pointer-events-none z-40">
+                      <GamePawn cellNum={playerPos} theme="player" name={user?.name || 'You'} active={turn === 'player'} traveling={travelingPlayer === 'player'} />
+                      <GamePawn cellNum={opponentPos} theme="opponent" name={opponentName} active={turn === 'opponent'} traveling={travelingPlayer === 'opponent'} />
+                    </div>
                   </div>
-
-                  {/* LAYER 2: VISUAL SVG OVERLAY CANVAS FOR SNAKES & LADDERS (z-10) */}
-                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full z-10 pointer-events-none">
-                    {/* Render 3D Textured Wooden Ladders */}
-                    {Object.entries(LADDERS_MAP).map(([start, end]) =>
-                      renderSVGLadder(Number(start), Number(end), `ladder-${start}`)
-                    )}
-
-                    {/* Render Realistic Cobra Python Snakes */}
-                    {Object.entries(SNAKES_MAP).map(([head, tail]) =>
-                      renderSVGSnake(Number(head), Number(tail), `snake-${head}`)
-                    )}
-                  </svg>
-
-                  {/* LAYER 3: TOP-LEVEL 3D PHYSICAL GAME PAWNS (z-50 -> ALWAYS ON TOP!) */}
-                  <div className="absolute inset-0 w-full h-full pointer-events-none z-50">
-                    {renderTopOverlay3DPawn(playerPos, 'red', user?.name || 'You', travelingPlayer === 'player')}
-                    {renderTopOverlay3DPawn(opponentPos, 'blue', opponentName, travelingPlayer === 'opponent')}
-                  </div>
-
                 </div>
               </div>
 
-              {/* Controls & 3D Casino Dice */}
+              {/* Controls & Real 3D Dice */}
               <div className="lg:col-span-4 space-y-6">
                 <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 space-y-6 text-center">
-                  
                   {winner ? (
                     <div className="p-4 rounded-2xl bg-emerald-500/20 text-emerald-500 font-extrabold text-base flex flex-col items-center justify-center space-y-1 animate-bounce">
                       <Trophy className="w-8 h-8 text-amber-400 fill-current drop-shadow-md" />
@@ -631,7 +893,7 @@ export default function SnakeLadderPage() {
                   ) : isOpponentThinking ? (
                     <div className="p-3 rounded-xl bg-sky-500/10 text-sky-500 font-bold text-xs flex items-center justify-center space-x-2">
                       <Clock className="w-4 h-4 animate-spin" />
-                      <span>{opponentName} rolling 3D dice...</span>
+                      <span>{opponentName} is rolling...</span>
                     </div>
                   ) : (
                     <div className="space-y-1">
@@ -645,9 +907,9 @@ export default function SnakeLadderPage() {
                     </div>
                   )}
 
-                  {/* 3D Casino White Dice */}
+                  {/* Real 3D Dice */}
                   <div className="flex justify-center my-4">
-                    {render3DCasinoDice(diceVal)}
+                    <Dice3D rotation={cubeRotation} rolling={isRolling} />
                   </div>
 
                   <button
@@ -655,7 +917,7 @@ export default function SnakeLadderPage() {
                     onClick={rollDice}
                     className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base shadow-xl disabled:opacity-40 transition-all"
                   >
-                    {isRolling ? 'Rolling 3D Dice...' : 'Roll 3D Dice 🎲'}
+                    {isRolling ? 'Rolling...' : 'Roll Dice 🎲'}
                   </button>
 
                   <button
@@ -665,15 +927,32 @@ export default function SnakeLadderPage() {
                     <RotateCcw className="w-4 h-4" />
                     <span>New Match (₹10 Stake)</span>
                   </button>
-
                 </div>
               </div>
-
             </div>
           )}
-
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes pawnHop {
+          0% {
+            transform: translate(-50%, -100%) scale(1) translateY(0);
+          }
+          35% {
+            transform: translate(-50%, -100%) scale(1.08) translateY(-10px);
+          }
+          70% {
+            transform: translate(-50%, -100%) scale(0.97) translateY(0);
+          }
+          100% {
+            transform: translate(-50%, -100%) scale(1) translateY(0);
+          }
+        }
+        .animate-pawn-hop {
+          animation: pawnHop 0.3s ease-in-out infinite;
+        }
+      `}</style>
     </ProtectedRoute>
   );
 }
