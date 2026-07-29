@@ -22,10 +22,10 @@ import {
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 
-export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
-export type GameMode = '1v1' | '1v2' | '1v3';
+type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
+type GameMode = '1v1' | '1v2' | '1v3';
 
-export interface Token {
+interface Token {
   id: number; // 0..3
   color: PlayerColor;
   position: number; // -1 = Base, 0..51 = Circuit, 100..104 = Home Stretch, 200 = Finished Home

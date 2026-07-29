@@ -28,16 +28,16 @@ import { getRandomOpponentName } from '../../../utils/realPlayers';
 // CORE TYPES & SPECIFICATIONS
 // ============================================================================
 
-export type Suit = 'S' | 'H' | 'D' | 'C';
-export type TableSize = 2 | 3 | 4 | 5 | 6;
+type Suit = 'S' | 'H' | 'D' | 'C';
+type TableSize = 2 | 3 | 4 | 5 | 6;
 
-export interface Card {
+interface Card {
   rank: number; // 2..14 (14 = Ace)
   suit: Suit;
   id: string;
 }
 
-export type PlayerState =
+type PlayerState =
   | 'Waiting'
   | 'Active'
   | 'Blind'
@@ -46,7 +46,7 @@ export type PlayerState =
   | 'SideShowPending'
   | 'Winner';
 
-export interface TPPlayer {
+interface TPPlayer {
   id: string; // 'user', 'p1', 'p2', etc.
   name: string;
   cards: Card[];
@@ -56,19 +56,19 @@ export interface TPPlayer {
   totalBet: number;
 }
 
-export interface HandResult {
+interface HandResult {
   category: number; // 6 Trail/Trio, 5 Pure Seq, 4 Seq, 3 Color/Flush, 2 Pair, 1 High Card
   label: string;
   tiebreak: number[];
 }
 
-export interface SideShowRequest {
+interface SideShowRequest {
   fromPlayerId: string;
   toPlayerId: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
 }
 
-export interface RoundResult {
+interface RoundResult {
   id: string;
   winnerId: string;
   category: number;
@@ -78,7 +78,7 @@ export interface RoundResult {
   showdown?: { a: string; b: string; handA: HandResult; handB: HandResult } | null;
 }
 
-export interface GameState {
+interface GameState {
   phase: 'lobby' | 'playing' | 'sideshow-pending' | 'result';
   tableSize: TableSize;
   bootAmount: number;
@@ -104,7 +104,7 @@ const TURN_SECONDS = 18;
 
 const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
 const RANK_LABELS: Record<number, string> = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-export const HAND_LABELS: Record<number, string> = {
+const HAND_LABELS: Record<number, string> = {
   6: 'Trio / Trail (AAA)',
   5: 'Pure Sequence (Straight Flush)',
   4: 'Sequence (Straight)',
@@ -158,7 +158,7 @@ function shuffleDeck(deck: Card[]): Card[] {
   return a;
 }
 
-export function evaluateHand(cards: Card[]): HandResult {
+function evaluateHand(cards: Card[]): HandResult {
   if (!cards || cards.length !== 3) {
     return { category: 1, label: HAND_LABELS[1], tiebreak: [2, 2, 2] };
   }
@@ -205,7 +205,7 @@ export function evaluateHand(cards: Card[]): HandResult {
   return { category: 1, label: HAND_LABELS[1], tiebreak: ranks };
 }
 
-export function compareHands(a: HandResult, b: HandResult): number {
+function compareHands(a: HandResult, b: HandResult): number {
   if (a.category !== b.category) return a.category - b.category;
   for (let i = 0; i < Math.max(a.tiebreak.length, b.tiebreak.length); i++) {
     const diff = (a.tiebreak[i] || 0) - (b.tiebreak[i] || 0);
