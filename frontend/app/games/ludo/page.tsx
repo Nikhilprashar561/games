@@ -74,12 +74,12 @@ const COLOR_THEME: Record<PlayerColor, { base: string; tile: string; text: strin
   blue: { base: 'bg-blue-600', tile: 'bg-blue-600', text: 'text-white', grad: ['#93c5fd', '#1e40af'], ring: '#bfdbfe' },
 };
 
-// Color mapping for glossy gem-style token markers
-const PIN_COLOR_HEX: Record<PlayerColor, { main: string; light: string; dark: string; border: string }> = {
-  red: { main: '#e11d48', light: '#fda4af', dark: '#9f1239', border: '#ffffff' },
-  green: { main: '#16a34a', light: '#86efac', dark: '#14532d', border: '#ffffff' },
-  yellow: { main: '#eab308', light: '#fde68a', dark: '#92400e', border: '#ffffff' },
-  blue: { main: '#2563eb', light: '#93c5fd', dark: '#1e3a8a', border: '#ffffff' },
+// Color mapping for the teardrop location-pin token markers
+const PIN_COLOR_HEX: Record<PlayerColor, { main: string; border: string }> = {
+  red: { main: '#e11d48', border: '#ffe4e6' },
+  green: { main: '#16a34a', border: '#dcfce7' },
+  yellow: { main: '#eab308', border: '#fef9c3' },
+  blue: { main: '#2563eb', border: '#dbeafe' },
 };
 
 const FACE_ROTATIONS: Record<number, { x: number; y: number }> = {
@@ -219,7 +219,6 @@ export default function LudoPage() {
   const [travelingTokenId, setTravelingTokenId] = useState<{ color: PlayerColor; id: number } | null>(null);
   const [travelPath, setTravelPath] = useState<[number, number][]>([]);
   const [popupBanner, setPopupBanner] = useState<{ type: 'capture' | 'safe' | 'home'; message: string } | null>(null);
-  const [turnTimer, setTurnTimer] = useState<number>(15);
 
   const turnOrder: PlayerColor[] = gameMode === '1v1'
     ? [userColor, OPPOSITE_COLORS[userColor]]
@@ -233,22 +232,6 @@ export default function LudoPage() {
       setPopupBanner(null);
     }, 2500);
   };
-
-  useEffect(() => {
-    if (!hasPaidEntry || winner) return;
-
-    const timer = setInterval(() => {
-      setTurnTimer((prev) => {
-        if (prev <= 1) {
-          nextTurn();
-          return 15;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentTurn, hasPaidEntry, winner]);
 
   const handleStartMatch = async () => {
     if (!user) return;
@@ -271,7 +254,6 @@ export default function LudoPage() {
     setIsOpponentThinking(false);
     setConsecutiveSixes(0);
     setWinner(null);
-    setTurnTimer(15);
   };
 
   const getMovableTokens = (color: PlayerColor, dice: number): Token[] => {
@@ -568,7 +550,6 @@ export default function LudoPage() {
     const nextCol = turnOrder[(curIdx + 1) % turnOrder.length];
     setCurrentTurn(nextCol);
     setHasRolled(false);
-    setTurnTimer(15);
   };
 
   // ---------- 3D DICE (kept on the side panel, same interaction — just restyled) ----------
@@ -598,51 +579,47 @@ export default function LudoPage() {
     );
   };
 
-// ---------- GLOSSY GEM-STYLE TOKEN MARKER (perfectly centered, sits flush on the board) ----------
+// ---------- TEARDROP LOCATION-PIN TOKEN MARKER, grounded to the exact dead-center of its cell ----------
 const renderPawn = (
   color: PlayerColor,
   isSelectable: boolean = false,
   isTraveling: boolean = false,
   scaleFactor: 'normal' | 'medium' | 'small' = 'normal'
 ) => {
-  const { main, light, dark, border } = PIN_COLOR_HEX[color];
-  const gradId = `pawnGrad-${color}`;
+  const { main, border } = PIN_COLOR_HEX[color];
 
-  // Square, symmetric footprint so the visual weight always sits dead-center in its cell —
-  // no pointed "pin" tip that reads as floating above the board.
+  // Increased marker size for excellent visibility while fitting comfortably inside cells
   const sizeClasses =
     scaleFactor === 'small'
-      ? 'w-[16px] h-[16px] sm:w-[19px] sm:h-[19px]'
+      ? 'w-[15px] h-[19px] sm:w-[18px] sm:h-[23px]'
       : scaleFactor === 'medium'
-      ? 'w-[20px] h-[20px] sm:w-[23px] sm:h-[23px]'
-      : 'w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]';
+      ? 'w-[20px] h-[25px] sm:w-[24px] sm:h-[30px]'
+      : 'w-[26px] h-[33px] sm:w-[32px] sm:h-[40px]';
 
   return (
     <div
-      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 ${sizeClasses} ${
-        isTraveling ? 'scale-110' : ''
-      }`}
+      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 ${sizeClasses}`}
+      style={{ transform: isTraveling ? 'scale(1.12)' : 'none' }}
     >
       {isSelectable && (
         <div className="absolute -inset-1.5 rounded-full bg-emerald-400/50 blur-[4px] animate-pulse pointer-events-none" />
       )}
 
-      {/* Grounded contact shadow so the piece reads as resting ON the cell, not above it */}
-      <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 w-[70%] h-[18%] rounded-full bg-black/35 blur-[1.5px] pointer-events-none" />
+      {/* Grounding contact shadow centered directly under the pin's base */}
+      <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[60%] h-[14%] rounded-full bg-black/35 blur-[1px] pointer-events-none" />
 
-      <svg viewBox="0 0 32 32" className="relative w-full h-full drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.35)]">
-        <defs>
-          <radialGradient id={gradId} cx="38%" cy="32%" r="75%">
-            <stop offset="0%" stopColor={light} />
-            <stop offset="55%" stopColor={main} />
-            <stop offset="100%" stopColor={dark} />
-          </radialGradient>
-        </defs>
-        {/* Outer white collar keeps the piece legible against any tile color */}
-        <circle cx="16" cy="16" r="14.5" fill={border} />
-        <circle cx="16" cy="16" r="12" fill={`url(#${gradId})`} stroke={dark} strokeWidth="0.75" />
-        {/* Glossy highlight */}
-        <ellipse cx="12" cy="10.5" rx="4.4" ry="3" fill="#ffffff" opacity="0.55" />
+      <svg
+        viewBox="0 0 24 30"
+        className="relative w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]"
+        fill="none"
+      >
+        <path
+          d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 30 12 30C12 30 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
+          fill={main}
+          stroke={border}
+          strokeWidth="1.2"
+        />
+        <circle cx="12" cy="11" r="5" fill="#ffffff" />
       </svg>
     </div>
   );
@@ -657,24 +634,19 @@ const renderPawn = (
 
     return (
       <div
-        className={`${gridClass} ${theme.base} relative p-2.5 sm:p-4 flex flex-col items-center justify-center transition-shadow duration-300 border-2 border-slate-900/30 ${
-          isCurrentTurn ? 'z-10 turn-glow-' + color : 'opacity-95'
-        }`}
+        className={`${gridClass} ${theme.base} relative p-2.5 sm:p-4 flex flex-col items-center justify-center border-2 border-slate-900/30`}
       >
-        {/* Turn indicator: animated glow ring + sheen, never resizes the element so nothing shifts */}
+        {/* Turn badge — clean, flat indicator with NO inner glow, white outline, or shadow overlays */}
         {isCurrentTurn && (
-          <>
-            <div className={`pointer-events-none absolute -inset-[3px] rounded-[4px] turn-ring-${color}`} />
-            <div className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/95 shadow-md turn-badge-pop">
-              <span className={`w-1.5 h-1.5 rounded-full ${theme.base} animate-pulse`} />
-              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wide text-slate-800">Turn</span>
-            </div>
-          </>
+          <div className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900 text-white shadow-sm border border-slate-700">
+            <span className={`w-1.5 h-1.5 rounded-full ${theme.base} animate-pulse`} />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wide">Turn</span>
+          </div>
         )}
 
-        {/* Subtle decorative pattern for a more "designed" surface */}
+        {/* Subtle decorative pattern for a clean surface */}
         <div
-          className="absolute inset-0 opacity-[0.08] pointer-events-none"
+          className="absolute inset-0 opacity-[0.06] pointer-events-none"
           style={{
             backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
             backgroundSize: '10px 10px',
@@ -682,7 +654,7 @@ const renderPawn = (
         />
 
         {/* Inner White Sockets Courtyard */}
-        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3.5 shadow-[inset_0_3px_10px_rgba(0,0,0,0.16)] border-2 border-white/70 ring-1 ring-slate-300/60 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3.5 items-center justify-items-center relative">
+        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3.5 shadow-[inset_0_2px_8px_rgba(0,0,0,0.12)] border-2 border-white/70 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3.5 items-center justify-items-center relative">
           {tokens[color].map((t) => {
             const inBase = t.position === -1;
             const isSelectable = canUnlock && inBase;
@@ -698,7 +670,7 @@ const renderPawn = (
                 className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all duration-200 ${
                   isSelectable
                     ? 'ring-4 ring-emerald-400 bg-emerald-50 scale-105 cursor-pointer shadow-lg animate-pulse'
-                    : 'bg-white shadow-[inset_0_2px_5px_rgba(0,0,0,0.16),0_1px_0_rgba(255,255,255,0.8)] border'
+                    : 'bg-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)] border'
                 }`}
                 style={!isSelectable ? { borderColor: `${PIN_COLOR_HEX[color].main}33` } : undefined}
               >
@@ -925,20 +897,30 @@ const renderPawn = (
                   {/* YELLOW BASE YARD */}
                   {renderBaseYard('yellow', 'row-start-10 col-start-10 col-span-6 row-span-6 border-t-2 border-l-2 border-slate-900')}
 
-                  {/* CENTER HOME — four color wedges meeting in the middle, like the reference board */}
+                  {/* CENTER HOME — polished pinwheel medallion: four color wedges with clean
+                      spoke dividers and a bezel ring, so it reads as a proper finish point
+                      rather than a flat block dropped onto the grid */}
                   <div
-                    className="col-start-7 row-start-7 col-span-3 row-span-3 flex flex-col items-center justify-center border-2 border-slate-900 shadow-2xl z-10 relative overflow-hidden"
+                    className="col-start-7 row-start-7 col-span-3 row-span-3 rounded-xl flex items-center justify-center z-10 relative overflow-hidden"
                     style={{
                       background: 'conic-gradient(from -45deg, #16a34a 0deg 90deg, #f59e0b 90deg 180deg, #2563eb 180deg 270deg, #e11d48 270deg 360deg)',
+                      boxShadow:
+                        'inset 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 2px rgba(15,23,42,0.85), 0 8px 20px rgba(0,0,0,0.35), inset 0 2px 6px rgba(255,255,255,0.25)',
                     }}
                   >
+                    {/* Diagonal spoke dividers between wedges, matching the crisp hairlines used across the rest of the board */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 rotate-45" />
+                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
+                    </div>
+
                     {winner ? (
-                      <div className="flex flex-col items-center animate-bounce bg-white/90 rounded-xl px-2 py-1">
+                      <div className="relative flex flex-col items-center animate-bounce bg-white rounded-xl px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2 ring-amber-300">
                         <Crown className="w-7 h-7 text-amber-500 fill-current drop-shadow-md" />
                         <span className="text-[9px] font-black uppercase text-slate-950">WINNER</span>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center bg-white/85 rounded-full w-8 h-8 sm:w-10 sm:h-10 items-center justify-center shadow-lg">
+                      <div className="relative flex items-center justify-center bg-white rounded-full w-8 h-8 sm:w-10 sm:h-10 shadow-[0_2px_10px_rgba(0,0,0,0.3)] ring-2 ring-white">
                         <Sparkles className="w-5 h-5 text-slate-950 animate-bounce" />
                       </div>
                     )}
@@ -977,6 +959,14 @@ const renderPawn = (
                         (row === 9 && col === 3) ||
                         (row === 7 && col === 13);
 
+                      // The home-stretch tile that sits directly against the center hub —
+                      // dressed up as a checkered finish line, like a real racing finish.
+                      const isFinishTile =
+                        (row === 8 && col === 6) ||
+                        (col === 8 && row === 6) ||
+                        (row === 8 && col === 10) ||
+                        (col === 8 && row === 10);
+
                       const arrow = ENTRY_ARROWS.find((a) => a.row === row && a.col === col);
 
                       return (
@@ -1001,11 +991,21 @@ const renderPawn = (
                               : 'inset 0 0 0 0.5px rgba(100,116,139,0.28)',
                           }}
                         >
-                          {isHomeStretch && (
+                          {isHomeStretch && !isFinishTile && (
                             <div
                               className={`pointer-events-none absolute bg-white/40 ${
                                 isRedHomeStr || isYellowHomeStr ? 'top-[15%] bottom-[15%] left-1/2 -translate-x-1/2 w-[3px]' : 'left-[15%] right-[15%] top-1/2 -translate-y-1/2 h-[3px]'
                               } rounded-full`}
+                            />
+                          )}
+                          {isFinishTile && (
+                            <div
+                              className="pointer-events-none absolute inset-0 opacity-90"
+                              style={{
+                                backgroundImage:
+                                  'repeating-conic-gradient(#ffffff 0% 25%, rgba(15,23,42,0.55) 0% 50%)',
+                                backgroundSize: '8px 8px',
+                              }}
                             />
                           )}
                           {isStarCell && <Star className="w-3 h-3 text-amber-400 fill-current" />}
@@ -1041,9 +1041,8 @@ const renderPawn = (
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase">
+                      <div className="text-xs font-bold text-slate-400 uppercase">
                         <span>Turn Player</span>
-                        <span>Timer: {turnTimer}s</span>
                       </div>
                       <p className="text-lg font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                         {currentTurn === userColor ? `Your Turn (${userColor.toUpperCase()})` : `${currentTurn.toUpperCase()} Turn`}
