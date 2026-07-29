@@ -206,7 +206,14 @@ export default function CarromPage() {
     shotPotted: new Set<string>(),
     pops: [] as PopAnim[],
     winnerLocked: false,
+    // Official Carrom Rules State
+    playerColor: null as PieceKind | null,
+    aiColor: null as PieceKind | null,
+    queenState: 'on_board' as 'on_board' | 'pending_player' | 'pending_ai' | 'covered_player' | 'covered_ai',
   });
+
+  const [entryCost, setEntryCost] = useState<number>(20);
+  const winReward = Math.round(entryCost * 1.8);
 
   const [hasPaidEntry, setHasPaidEntry] = useState(false);
   const [opponentName, setOpponentName] = useState('Rahul_Carrom');
@@ -223,6 +230,9 @@ export default function CarromPage() {
   const [whiteLeft, setWhiteLeft] = useState(9);
   const [blackLeft, setBlackLeft] = useState(9);
   const [queenOnBoard, setQueenOnBoard] = useState(true);
+  const [playerColorState, setPlayerColorState] = useState<PieceKind | null>(null);
+  const [aiColorState, setAiColorState] = useState<PieceKind | null>(null);
+  const [queenStateUI, setQueenStateUI] = useState<'on_board' | 'pending_player' | 'pending_ai' | 'covered_player' | 'covered_ai'>('on_board');
 
   const refreshCounts = useCallback(() => {
     const pcs = gameRef.current.pieces;
@@ -247,6 +257,9 @@ export default function CarromPage() {
       shotPotted: new Set<string>(),
       pops: [],
       winnerLocked: false,
+      playerColor: null,
+      aiColor: null,
+      queenState: 'on_board',
     };
     setTurn('player');
     setPlayerScore(0);
@@ -254,22 +267,25 @@ export default function CarromPage() {
     setIsSimulating(false);
     setIsAiThinking(false);
     setWinner(null);
-    setMessage('Drag the striker back to aim, release to shoot.');
+    setMessage('Break open! First colored coin pocketed assigns player colors.');
     setAngle(0);
     setPower(70);
     setStrikerX(CENTER);
     setWhiteLeft(9);
     setBlackLeft(9);
     setQueenOnBoard(true);
+    setPlayerColorState(null);
+    setAiColorState(null);
+    setQueenStateUI('on_board');
   }, []);
 
   const handleStartMatch = async () => {
     if (!user) return;
-    if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Carrom arena.`);
+    if ((user.walletBalance || 0) < entryCost) {
+      alert(`Insufficient wallet balance! You need ₹${entryCost} to enter Carrom arena.`);
       return;
     }
-    await updateWalletBalance(-ENTRY_COST);
+    await updateWalletBalance(-entryCost);
     setOpponentName(getRandomOpponentName());
     setHasPaidEntry(true);
     initGame();
@@ -395,24 +411,48 @@ export default function CarromPage() {
   }, []);
 
   /* ---------------------------------------------------------------------
-   * SHOT RESOLUTION — real carrom scoring rules, run once all pieces stop
+   * SHOT RESOLUTION — Official Carrom Rules Engine
    * -------------------------------------------------------------------*/
   const resolveShot = useCallback(() => {
     const g = gameRef.current;
-    const currentTurn = g.turn;
-    const currentKind: PieceKind = currentTurn === 'player' ? 'white' : 'black';
-    const opponentKind: PieceKind = currentTurn === 'player' ? 'black' : 'white';
-
+    const shooter = g.turn;
     const strikerFoul = g.shotPotted.has('striker');
     const pottedPieces = g.pieces.filter((p) => g.shotPotted.has(p.id) && p.kind !== 'striker');
 
-    let scoreDelta = 0;
-    let continueTurn = false;
-    let msg = '';
+    const pottedWhite = pottedPieces.filter((p) => p.kind === 'white');
+    const pottedBlack = pottedPieces.filter((p) => p.kind === 'black');
+    const pottedQueen = pottedPieces.some((p) => p.kind === 'queen');
 
+    let msg = '';
+    let continueTurn = false;
+
+    // 1. DYNAMIC COLOR ASSIGNMENT (assigned on first colored coin pocketed)
+    if (!g.playerColor && !g.aiColor) {
+      const firstColorCoin = pottedPieces.find((p) => p.kind === 'white' || p.kind === 'black');
+      if (firstColorCoin) {
+        if (shooter === 'player') {
+          g.playerColor = firstColorCoin.kind;
+          g.aiColor = firstColorCoin.kind === 'white' ? 'black' : 'white';
+        } else {
+          g.aiColor = firstColorCoin.kind;
+          g.playerColor = firstColorCoin.kind === 'white' ? 'black' : 'white';
+        }
+        setPlayerColorState(g.playerColor);
+        setAiColorState(g.aiColor);
+        msg += `${shooter === 'player' ? 'You' : opponentName} pocketed ${firstColorCoin.kind.toUpperCase()} first! Color assigned. `;
+      }
+    }
+
+    const shooterColor = shooter === 'player' ? g.playerColor : g.aiColor;
+    const oppColor = shooter === 'player' ? g.aiColor : g.playerColor;
+
+    const pottedOwn = shooterColor ? pottedPieces.filter((p) => p.kind === shooterColor) : [];
+    const pottedOpp = oppColor ? pottedPieces.filter((p) => p.kind === oppColor) : [];
+
+    // 2. STRIKER FOUL HANDLING
     if (strikerFoul) {
-      // Foul: the whole stroke is voided — anything pocketed this shot is
-      // respotted, and a penalty is applied.
+      msg = 'Foul! Striker pocketed — turn ends.';
+      // Respot all coins pocketed in this foul stroke back to board center
       pottedPieces.forEach((p) => {
         const spot = findFreeSpot(g.pieces, p.r, p.id);
         p.x = spot.x;
@@ -421,84 +461,131 @@ export default function CarromPage() {
         p.vy = 0;
         p.potted = false;
       });
-      scoreDelta = -FOUL_PENALTY;
-      msg = 'Foul! Striker pocketed — stroke voided, -5 points.';
-      continueTurn = false;
-    } else {
-      const own = pottedPieces.filter((p) => p.kind === currentKind);
-      const opp = pottedPieces.filter((p) => p.kind === opponentKind);
-      const queen = pottedPieces.find((p) => p.kind === 'queen');
 
-      // Potting the opponent's coin scores nothing and it goes back on the board.
-      opp.forEach((p) => {
-        const spot = findFreeSpot(g.pieces, p.r, p.id);
-        p.x = spot.x;
-        p.y = spot.y;
-        p.vx = 0;
-        p.vy = 0;
-        p.potted = false;
-      });
-
-      scoreDelta = own.length * COIN_POINTS;
-
-      if (queen) {
-        if (own.length > 0) {
-          // Queen must be "covered" by one of your own coins in the same
-          // stroke, otherwise she isn't banked.
-          scoreDelta += QUEEN_POINTS;
-          msg = `Queen covered! +${scoreDelta} points.`;
-        } else {
-          const spot = findFreeSpot(g.pieces, queen.r, queen.id);
-          queen.x = spot.x;
-          queen.y = spot.y;
-          queen.vx = 0;
-          queen.vy = 0;
-          queen.potted = false;
-          msg = 'Queen must be covered with your own coin — respotted, no bonus.';
+      // If Queen was pending cover for shooter, respot Queen to center (cover failed)
+      if (
+        (shooter === 'player' && g.queenState === 'pending_player') ||
+        (shooter === 'ai' && g.queenState === 'pending_ai')
+      ) {
+        const queenPiece = g.pieces.find((p) => p.kind === 'queen');
+        if (queenPiece) {
+          const spot = findFreeSpot(g.pieces, queenPiece.r, queenPiece.id);
+          queenPiece.x = spot.x;
+          queenPiece.y = spot.y;
+          queenPiece.potted = false;
         }
-      } else if (own.length > 0) {
-        msg = `Nice shot! +${scoreDelta} points — go again.`;
-      } else if (opp.length > 0) {
-        msg = "Potted the opponent's coin — no points, turn passes.";
-      } else {
-        msg = 'Miss — turn passes.';
+        g.queenState = 'on_board';
       }
 
-      continueTurn = own.length > 0;
+      // Penalty: Respot 1 previously pocketed coin if available
+      if (shooterColor) {
+        const previouslyPocketed = g.pieces.filter(
+          (p) => p.kind === shooterColor && p.potted && !g.shotPotted.has(p.id)
+        );
+        if (previouslyPocketed.length > 0) {
+          const penaltyCoin = previouslyPocketed[0];
+          const spot = findFreeSpot(g.pieces, penaltyCoin.r, penaltyCoin.id);
+          penaltyCoin.x = spot.x;
+          penaltyCoin.y = spot.y;
+          penaltyCoin.potted = false;
+          msg += ' Penalty: 1 coin returned to center.';
+        }
+      }
+
+      continueTurn = false;
+    } else {
+      // 3. NORMAL SHOT HANDLING (NO FOUL)
+
+      // Check pending Queen cover resolution from previous turn
+      const isPendingCover =
+        (shooter === 'player' && g.queenState === 'pending_player') ||
+        (shooter === 'ai' && g.queenState === 'pending_ai');
+
+      if (isPendingCover) {
+        if (pottedOwn.length > 0 || (!shooterColor && (pottedWhite.length > 0 || pottedBlack.length > 0))) {
+          // QUEEN COVERED SUCCESSFULLY!
+          g.queenState = shooter === 'player' ? 'covered_player' : 'covered_ai';
+          msg = 'Queen covered successfully! ';
+        } else {
+          // COVER FAILED -> RESPOOT QUEEN
+          const queenPiece = g.pieces.find((p) => p.kind === 'queen');
+          if (queenPiece) {
+            const spot = findFreeSpot(g.pieces, queenPiece.r, queenPiece.id);
+            queenPiece.x = spot.x;
+            queenPiece.y = spot.y;
+            queenPiece.potted = false;
+          }
+          g.queenState = 'on_board';
+          msg = 'Queen cover failed — Queen returned to board. ';
+        }
+      }
+
+      // Check Queen pocketed in THIS shot
+      if (pottedQueen) {
+        if (pottedOwn.length > 0 || (!shooterColor && (pottedWhite.length > 0 || pottedBlack.length > 0))) {
+          // QUEEN + OWN COIN IN SAME SHOT!
+          g.queenState = shooter === 'player' ? 'covered_player' : 'covered_ai';
+          msg += 'Queen & coin pocketed together! Queen covered!';
+          continueTurn = true;
+        } else {
+          // QUEEN POCKETED ALONE -> PENDING COVER ON NEXT SHOT
+          g.queenState = shooter === 'player' ? 'pending_player' : 'pending_ai';
+          msg += 'Queen pocketed alone! Must cover on next shot.';
+          continueTurn = true;
+        }
+      } else if (pottedOwn.length > 0 || (!shooterColor && (pottedWhite.length > 0 || pottedBlack.length > 0))) {
+        msg += 'Coin pocketed! Take another turn.';
+        continueTurn = true;
+      } else if (pottedOpp.length > 0) {
+        msg += "Pocketed opponent's coin — turn passes.";
+        continueTurn = false;
+      } else if (!isPendingCover) {
+        msg = 'Miss — turn passes.';
+        continueTurn = false;
+      }
     }
 
-    if (currentTurn === 'player') {
-      setPlayerScore((s) => Math.max(0, s + scoreDelta));
-    } else {
-      setAiScore((s) => Math.max(0, s + scoreDelta));
-    }
+    // Update counts & scores
+    const playerOwnLeft = g.playerColor
+      ? g.pieces.filter((p) => p.kind === g.playerColor && !p.potted).length
+      : 9;
+    const aiOwnLeft = g.aiColor
+      ? g.pieces.filter((p) => p.kind === g.aiColor && !p.potted).length
+      : 9;
+
+    const playerPottedCount = 9 - playerOwnLeft;
+    const aiPottedCount = 9 - aiOwnLeft;
+
+    setPlayerScore(playerPottedCount * 10 + (g.queenState === 'covered_player' ? 30 : 0));
+    setAiScore(aiPottedCount * 10 + (g.queenState === 'covered_ai' ? 30 : 0));
+    setQueenStateUI(g.queenState);
     setMessage(msg);
     refreshCounts();
 
-    // Win check
-    const finalPlayerScore = currentTurn === 'player' ? Math.max(0, playerScore + scoreDelta) : playerScore;
-    const finalAiScore = currentTurn === 'ai' ? Math.max(0, aiScore + scoreDelta) : aiScore;
+    // WIN CHECK
+    const isQueenCovered = g.queenState === 'covered_player' || g.queenState === 'covered_ai';
 
-    if (!g.winnerLocked && finalPlayerScore >= WIN_SCORE) {
+    if (!g.winnerLocked && g.playerColor && playerOwnLeft === 0 && isQueenCovered) {
       g.winnerLocked = true;
       const winnerName = user?.name || 'Player';
       setWinner(winnerName);
-      updateWalletBalance(WIN_REWARD);
-      recordGameMatch('carrom', 'Pro Carrom Board', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
+      updateWalletBalance(winReward);
+      recordGameMatch('carrom', 'Pro Carrom Board', 'WIN', entryCost, winReward, opponentName);
       confetti({ particleCount: 120, spread: 80 });
       setIsSimulating(false);
       return;
     }
-    if (!g.winnerLocked && finalAiScore >= WIN_SCORE) {
+
+    if (!g.winnerLocked && g.aiColor && aiOwnLeft === 0 && isQueenCovered) {
       g.winnerLocked = true;
       setWinner(opponentName);
-      recordGameMatch('carrom', 'Pro Carrom Board', 'LOSS', ENTRY_COST, 0, opponentName);
+      recordGameMatch('carrom', 'Pro Carrom Board', 'LOSS', entryCost, 0, opponentName);
       setIsSimulating(false);
       return;
     }
 
-    // Reset striker for whoever plays next
-    const nextTurn: Turn = continueTurn ? currentTurn : currentTurn === 'player' ? 'ai' : 'player';
+    // Reset striker & turn rotation
+    const nextTurn: Turn = continueTurn ? shooter : shooter === 'player' ? 'ai' : 'player';
     g.turn = nextTurn;
     setTurn(nextTurn);
 
@@ -515,15 +602,12 @@ export default function CarromPage() {
     setIsSimulating(false);
 
     if (nextTurn === 'ai') {
-      // Staged, variable pacing so the opponent's turn feels like a beat of
-      // deliberation rather than an instant computed move. Purely a UI/timing
-      // affordance — aiPlayTurn's underlying targeting logic is unchanged.
       setIsAiThinking(true);
       setMessage(`${opponentName} is thinking...`);
-      const thinkDelay = 700 + Math.random() * 900; // ~0.7s - 1.6s
+      const thinkDelay = 700 + Math.random() * 900;
       aiTimeoutRef.current = setTimeout(() => {
         setMessage(`${opponentName} is lining up the shot...`);
-        const aimDelay = 450 + Math.random() * 550; // ~0.45s - 1s
+        const aimDelay = 450 + Math.random() * 550;
         aiTimeoutRef.current = setTimeout(() => {
           aiPlayTurn();
           setIsAiThinking(false);
@@ -1036,7 +1120,7 @@ export default function CarromPage() {
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-extrabold text-sm">
                 <Wallet className="w-4 h-4" />
-                <span>Entry: ₹{ENTRY_COST} | Win: ₹{WIN_REWARD}</span>
+                <span>Entry: ₹{entryCost} | Win: ₹{winReward}</span>
               </div>
             </div>
           </div>
@@ -1049,15 +1133,34 @@ export default function CarromPage() {
               <div className="max-w-md mx-auto space-y-2">
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">First to {WIN_SCORE} Points Wins!</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Pay ₹{ENTRY_COST} entry to play against an AI opponent that aims and strikes using the same real
+                  Select your stake and play against an AI opponent that aims and strikes using the same real
                   physics engine as you. Cover the queen, pocket your coins, avoid fouls.
                 </p>
+
+                {/* Stake Selection Pills */}
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <span className="text-xs font-extrabold text-slate-400 uppercase mr-1">Select Stake:</span>
+                  {[10, 20, 50, 100].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setEntryCost(amt)}
+                      className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition-all ${
+                        entryCost === amt
+                          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-105 ring-2 ring-emerald-400'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
               </div>
               <button
                 onClick={handleStartMatch}
                 className="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-lg shadow-xl shadow-emerald-500/25 transition-all"
               >
-                Pay ₹{ENTRY_COST} & Play Carrom!
+                Pay ₹{entryCost} & Play Carrom! (Win ₹{winReward})
               </button>
             </div>
           ) : (
@@ -1094,13 +1197,13 @@ export default function CarromPage() {
                   ) : (
                     <div className="space-y-3 font-['Space_Grotesk'] text-center">
                       <div className={`p-3 rounded-xl transition-colors ${turn === 'player' ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                        <p className="text-xs font-bold text-slate-400">YOUR SCORE ({user?.name}) · WHITE</p>
+                        <p className="text-xs font-bold text-slate-400">YOUR SCORE ({user?.name}) · {playerColorState ? playerColorState.toUpperCase() : 'UNASSIGNED'}</p>
                         <p className="text-2xl font-black text-emerald-500">
                           {playerScore} / {WIN_SCORE}
                         </p>
                       </div>
                       <div className={`p-3 rounded-xl transition-colors ${turn === 'ai' ? 'bg-amber-500/10 ring-1 ring-amber-500/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                        <p className="text-xs font-bold text-slate-400">{opponentName} · BLACK</p>
+                        <p className="text-xs font-bold text-slate-400">{opponentName} · {aiColorState ? aiColorState.toUpperCase() : 'UNASSIGNED'}</p>
                         <p className="text-2xl font-black text-amber-500">
                           {aiScore} / {WIN_SCORE}
                         </p>
@@ -1116,7 +1219,7 @@ export default function CarromPage() {
                         </div>
                         <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
                           <Crown className="w-3.5 h-3.5 mx-auto mb-1 text-rose-500" />
-                          Queen: {queenOnBoard ? 'on board' : 'potted'}
+                          Queen: {queenStateUI === 'on_board' ? 'On board' : queenStateUI.startsWith('pending') ? 'Pending cover' : 'Covered'}
                         </div>
                       </div>
                     </div>
@@ -1182,7 +1285,7 @@ export default function CarromPage() {
                     className="w-full py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>New Match (₹{ENTRY_COST} Stake)</span>
+                    <span>New Match (₹{entryCost} Stake)</span>
                   </button>
                 </div>
               </div>

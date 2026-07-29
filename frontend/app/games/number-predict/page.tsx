@@ -4,288 +4,405 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, Wallet, Sparkles, Trophy, RotateCcw, Gift, Bomb, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Wallet,
+  Sparkles,
+  Trophy,
+  RotateCcw,
+  Gift,
+  Bomb,
+  X,
+  Coins,
+  TrendingUp,
+  Target,
+  Percent,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-interface GridTile {
+interface VaultTile {
   num: number;
-  reward: number; // 0 = bomb/loss, >0 = won ₹ rupees
+  reward: number; // 0 = empty tile, >0 = cash prize in rupees
   isFlipped: boolean;
+}
+
+interface SessionStats {
+  attempts: number;
+  wins: number;
+  losses: number;
+  totalWon: number;
+}
+
+const ENTRY_COST = 10;
+
+// Payout structure — 25 of 100 tiles pay out (25% odds), the rest are empty.
+const PAYOUT_TIERS = [
+  { amount: 250, count: 2 },
+  { amount: 100, count: 5 },
+  { amount: 50, count: 8 },
+  { amount: 20, count: 10 },
+];
+const TOTAL_TILES = 100;
+const WIN_TILE_COUNT = PAYOUT_TIERS.reduce((sum, t) => sum + t.count, 0);
+const EMPTY_TILE_COUNT = TOTAL_TILES - WIN_TILE_COUNT;
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 export default function NumberPredictPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal } = useAuth();
-  const ENTRY_COST = 10;
 
-  const [hasEntered, setHasEntered] = useState<boolean>(false);
-  const [tiles, setTiles] = useState<GridTile[]>([]);
-  const [flippedTile, setFlippedTile] = useState<GridTile | null>(null);
-  const [showPopupModal, setShowPopupModal] = useState<boolean>(false);
-  const [popupMessage, setPopupMessage] = useState<{ title: string; desc: string; type: 'win' | 'sorry' } | null>(null);
+  const [hasEntered, setHasEntered] = useState(false);
+  const [tiles, setTiles] = useState<VaultTile[]>([]);
+  const [flippedIndex, setFlippedIndex] = useState<number | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [popup, setPopup] = useState<{ title: string; desc: string; type: 'win' | 'sorry' } | null>(null);
+  const [sessionStats, setSessionStats] = useState<SessionStats>({
+    attempts: 0,
+    wins: 0,
+    losses: 0,
+    totalWon: 0,
+  });
 
-  // Generate unsystematically shuffled 1-100 grid with strict 25% win odds
-  const initializeGrid = () => {
-    // 1 to 100 numbers array
-    const numbers = Array.from({ length: 100 }, (_, i) => i + 1);
-    // Shuffle array unsystematically
-    for (let i = numbers.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
-    }
+  const initializeVault = () => {
+    const numbers = shuffle(Array.from({ length: TOTAL_TILES }, (_, i) => i + 1));
+    const rewardsPool = shuffle([
+      ...PAYOUT_TIERS.flatMap((t) => Array(t.count).fill(t.amount)),
+      ...Array(EMPTY_TILE_COUNT).fill(0),
+    ]);
 
-    // Exactly 25 winning tiles (25% probability)
-    // 2 x ₹250, 5 x ₹100, 8 x ₹50, 10 x ₹20 = 25 winning tiles
-    const rewardsPool = [
-      ...Array(2).fill(250),
-      ...Array(5).fill(100),
-      ...Array(8).fill(50),
-      ...Array(10).fill(20),
-      ...Array(75).fill(0), // 75 bomb tiles
-    ];
-
-    // Shuffle rewards pool
-    for (let i = rewardsPool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rewardsPool[i], rewardsPool[j]] = [rewardsPool[j], rewardsPool[i]];
-    }
-
-    const newTiles: GridTile[] = numbers.map((num, idx) => ({
-      num,
-      reward: rewardsPool[idx],
-      isFlipped: false,
-    }));
-
-    setTiles(newTiles);
+    setTiles(numbers.map((num, idx) => ({ num, reward: rewardsPool[idx], isFlipped: false })));
   };
 
-  const handleEnterGame = async () => {
+  const handleEnter = async () => {
     if (!user) {
       openAuthModal();
       return;
     }
     if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to flip a tile.`);
+      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to reveal a tile.`);
       return;
     }
 
     await updateWalletBalance(-ENTRY_COST);
-    initializeGrid();
+    initializeVault();
     setHasEntered(true);
-    setFlippedTile(null);
-    setShowPopupModal(false);
-    setPopupMessage(null);
+    setFlippedIndex(null);
+    setShowPopup(false);
+    setPopup(null);
   };
 
   const handleTileClick = async (index: number) => {
-    if (!hasEntered || flippedTile) return;
+    if (!hasEntered || flippedIndex !== null) return;
 
     const selected = tiles[index];
-    selected.isFlipped = true;
-    setFlippedTile(selected);
+    setTiles((prev) => prev.map((t, i) => (i === index ? { ...t, isFlipped: true } : t)));
+    setFlippedIndex(index);
 
     if (selected.reward > 0) {
-      // WIN: Credit real money directly to user wallet
       await updateWalletBalance(selected.reward);
       await recordGameMatch('number-predict', 'Number Predict & Win', 'WIN', ENTRY_COST, selected.reward, 'Jackpot Grid');
+      setSessionStats((s) => ({
+        ...s,
+        attempts: s.attempts + 1,
+        wins: s.wins + 1,
+        totalWon: s.totalWon + selected.reward,
+      }));
       confetti({ particleCount: 100, spread: 80, origin: { y: 0.5 } });
-
-      setPopupMessage({
-        title: `CONGRATULATIONS! YOU WON ₹${selected.reward}! 🎉`,
-        desc: `Tile #${selected.num} contained ₹${selected.reward}! Money has been credited directly to your Wallet Account.`,
+      setPopup({
+        title: `You won ₹${selected.reward}!`,
+        desc: `Tile #${selected.num} held ₹${selected.reward}. It's already in your wallet.`,
         type: 'win',
       });
     } else {
-      // LOSS: 75% bomb tile
       await recordGameMatch('number-predict', 'Number Predict & Win', 'LOSS', ENTRY_COST, 0, 'Jackpot Grid');
-      setPopupMessage({
-        title: 'Better Luck Next Time! 💣',
-        desc: `Tile #${selected.num} triggered a bomb! Try again for cash rewards!`,
+      setSessionStats((s) => ({ ...s, attempts: s.attempts + 1, losses: s.losses + 1 }));
+      setPopup({
+        title: 'Empty tile',
+        desc: `Tile #${selected.num} was empty this round. Try another vault!`,
         type: 'sorry',
       });
     }
-    setShowPopupModal(true);
+    setShowPopup(true);
   };
+
+  const winRate = sessionStats.attempts > 0 ? Math.round((sessionStats.wins / sessionStats.attempts) * 100) : 0;
+  const netResult = sessionStats.totalWon - sessionStats.attempts * ENTRY_COST;
 
   return (
     <ProtectedRoute>
+      <style jsx global>{`
+        .vault-tile-face {
+          backface-visibility: hidden;
+          position: absolute;
+          inset: 0;
+        }
+        .vault-tile-face-back {
+          transform: rotateY(180deg);
+        }
+        .vault-tile-inner {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transform-style: preserve-3d;
+          transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+        }
+        .vault-tile-flipped {
+          transform: rotateY(180deg);
+        }
+      `}</style>
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
           href="/"
-          className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-white transition-colors mb-6"
+          className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to All Games</span>
         </Link>
 
-        {/* Main High-Contrast Dark & White Grid Container */}
-        <div className="rounded-3xl p-6 sm:p-10 border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white shadow-2xl transition-colors duration-300">
-          
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-black/20 dark:border-white/20">
+        <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-bold uppercase mb-1">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>25% Win Rate Cash Grid</span>
+                <span>25% Odds Cash Vault</span>
               </div>
-              <h1 className="text-3xl font-black text-black dark:text-white font-['Space_Grotesk']">
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                 Number Predict & Win
               </h1>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 font-extrabold text-sm">
-                <Wallet className="w-4 h-4" />
-                <span>Entry Fee: ₹{ENTRY_COST}</span>
-              </div>
+            <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-extrabold text-sm">
+              <Wallet className="w-4 h-4" />
+              <span>Entry: ₹{ENTRY_COST} | Win up to ₹250</span>
             </div>
           </div>
 
           {!hasEntered ? (
-            <div className="text-center py-12 px-6 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/20 dark:border-white/20 space-y-6">
-              <div className="w-20 h-20 mx-auto rounded-3xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center shadow-2xl border border-black dark:border-white">
-                <Gift className="w-10 h-10 animate-bounce" />
+            <div className="text-center py-12 px-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-8">
+              <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-600 text-white flex items-center justify-center shadow-xl">
+                <Gift className="w-8 h-8" />
               </div>
 
               <div className="max-w-md mx-auto space-y-2">
-                <h2 className="text-2xl font-black font-['Space_Grotesk']">
-                  Flip 1 Tile to Win Up To ₹250!
-                </h2>
-                <p className="text-sm opacity-80 leading-relaxed font-semibold">
-                  Pay <span className="font-bold underline">₹10 entry</span> to reveal the unsystematically shuffled grid. 25 tiles contain real money cash prizes!
+                <h2 className="text-2xl font-black font-['Space_Grotesk']">Reveal 1 Tile, Win Up to ₹250</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Pay a ₹{ENTRY_COST} entry to open a freshly shuffled 100-tile vault. 25 tiles pay out real cash,
+                  straight to your wallet.
                 </p>
               </div>
 
+              {/* Payout tiers shown up front so the odds are clear before paying */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto">
+                {PAYOUT_TIERS.map((tier) => (
+                  <div
+                    key={tier.amount}
+                    className="py-3 px-2 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center"
+                  >
+                    <span className="text-lg font-black text-emerald-500">₹{tier.amount}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">{tier.count} tiles</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {EMPTY_TILE_COUNT} of {TOTAL_TILES} tiles are empty this round.
+              </p>
+
               <button
-                onClick={handleEnterGame}
-                className="px-8 py-4 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-2xl border border-black dark:border-white hover:scale-105 transition-all"
+                onClick={handleEnter}
+                className="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-lg shadow-xl shadow-emerald-500/25 transition-all transform hover:scale-105"
               >
-                Pay ₹10 & Reveal Grid!
+                Pay ₹{ENTRY_COST} & Open the Vault
               </button>
             </div>
           ) : (
-            <div className="space-y-6">
-              
-              <div className="text-center">
-                {flippedTile ? (
-                  <div className="inline-flex items-center space-x-3 px-8 py-3 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-2xl border border-black dark:border-white animate-fade-in">
-                    {flippedTile.reward > 0 ? (
-                      <>
-                        <Trophy className="w-6 h-6 text-amber-400 animate-bounce" />
-                        <span>REVEALED TILE #{flippedTile.num} AND WON ₹{flippedTile.reward}! 🎉</span>
-                      </>
-                    ) : (
-                      <>
-                        <Bomb className="w-6 h-6 text-rose-500 animate-ping" />
-                        <span>BOMB EXPLODED ON TILE #{flippedTile.num}! 💣</span>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center space-x-2 text-sm font-bold bg-black/5 dark:bg-white/10 px-5 py-2 rounded-full border border-black/20 dark:border-white/20">
-                    <Sparkles className="w-4 h-4 animate-pulse" />
-                    <span>Grid Active! Click any 1 box to flip!</span>
-                  </div>
-                )}
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Vault board */}
+              <div className="lg:col-span-8 flex flex-col items-center space-y-4">
+                <div className="text-center">
+                  {flippedIndex === null ? (
+                    <div className="inline-flex items-center space-x-2 text-sm font-bold bg-emerald-500/10 text-emerald-500 px-5 py-2 rounded-full border border-emerald-500/20">
+                      <Sparkles className="w-4 h-4" />
+                      <span>Vault unlocked — tap any tile to reveal it</span>
+                    </div>
+                  ) : tiles[flippedIndex].reward > 0 ? (
+                    <div className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-2xl bg-emerald-600 text-white font-black text-sm shadow-lg">
+                      <Trophy className="w-5 h-5 text-amber-300" />
+                      <span>
+                        Tile #{tiles[flippedIndex].num} paid ₹{tiles[flippedIndex].reward}!
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-2xl bg-slate-900 text-rose-400 font-black text-sm shadow-lg">
+                      <Bomb className="w-5 h-5" />
+                      <span>Tile #{tiles[flippedIndex].num} was empty</span>
+                    </div>
+                  )}
+                </div>
 
-              {/* Unsystematic Shuffled 10x10 Grid */}
-              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 sm:gap-2.5 max-w-4xl mx-auto p-4 rounded-3xl bg-black dark:bg-black border-4 border-black dark:border-white shadow-2xl relative">
-                {tiles.map((tile, idx) => (
-                  <button
-                    key={`${tile.num}-${idx}`}
-                    disabled={!!flippedTile}
-                    onClick={() => handleTileClick(idx)}
-                    className={`aspect-square rounded-xl text-xs sm:text-sm font-black flex items-center justify-center transition-all duration-300 transform select-none shadow-md relative overflow-hidden ${
-                      tile.isFlipped
-                        ? tile.reward > 0
-                          ? 'bg-white text-black scale-105 border-2 border-black font-black'
-                          : 'bg-rose-950 text-rose-400 border-2 border-rose-600 scale-105'
-                        : 'bg-zinc-900 hover:bg-white text-white hover:text-black border border-zinc-700 hover:scale-105'
-                    }`}
-                  >
-                    {tile.isFlipped ? (
-                      tile.reward > 0 ? (
-                        <span className="text-[10px] sm:text-xs font-black tracking-tighter text-black">
-                          ₹{tile.reward}
-                        </span>
-                      ) : (
-                        <div className="flex items-center justify-center animate-bounce">
-                          <Bomb className="w-5 h-5 text-rose-500 animate-pulse" />
+                <div className="w-full max-w-[460px] p-3 sm:p-4 rounded-3xl bg-slate-900 border-4 border-slate-900 dark:border-slate-700 shadow-2xl">
+                  <div className="grid grid-cols-10 gap-1 sm:gap-1.5">
+                    {tiles.map((tile, idx) => (
+                      <button
+                        key={`${tile.num}-${idx}`}
+                        disabled={flippedIndex !== null}
+                        onClick={() => handleTileClick(idx)}
+                        style={{ perspective: '400px' }}
+                        className="aspect-square rounded-md sm:rounded-lg disabled:cursor-default"
+                      >
+                        <div className={`vault-tile-inner ${tile.isFlipped ? 'vault-tile-flipped' : ''}`}>
+                          <div className="vault-tile-face rounded-md sm:rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-slate-400 transition-colors">
+                            {tile.num}
+                          </div>
+                          <div
+                            className={`vault-tile-face vault-tile-face-back rounded-md sm:rounded-lg border-2 flex items-center justify-center ${
+                              tile.reward > 0
+                                ? 'bg-white border-emerald-500 text-emerald-600'
+                                : 'bg-rose-950 border-rose-700 text-rose-400'
+                            }`}
+                          >
+                            {tile.reward > 0 ? (
+                              <span className="text-[8px] sm:text-[10px] font-black">₹{tile.reward}</span>
+                            ) : (
+                              <Bomb className="w-3 h-3 sm:w-4 sm:h-4" />
+                            )}
+                          </div>
                         </div>
-                      )
-                    ) : (
-                      /* Display Shuffled Tile Number */
-                      <span>{tile.num}</span>
-                    )}
-                  </button>
-                ))}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {flippedTile && (
-                <div className="flex justify-center pt-4">
+              {/* Session analytics + controls */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 space-y-6">
                   <button
-                    onClick={handleEnterGame}
-                    className="px-8 py-3.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-sm border-2 border-black dark:border-white hover:scale-105 transition-all flex items-center space-x-2 shadow-xl"
+                    onClick={handleEnter}
+                    className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base shadow-xl transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Play Again (₹10 Entry)</span>
+                    <span>New Vault (₹{ENTRY_COST} Entry)</span>
                   </button>
-                </div>
-              )}
 
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center space-x-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      <span className="text-xs font-black uppercase text-slate-900 dark:text-white font-['Space_Grotesk']">
+                        Session Analytics
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                        <div className="flex items-center space-x-1 text-slate-400">
+                          <Target className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase">Attempts</span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 dark:text-white">
+                          {sessionStats.attempts}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                        <div className="flex items-center space-x-1 text-slate-400">
+                          <Percent className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase">Win Rate</span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 dark:text-white">{winRate}%</span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                        <div className="flex items-center space-x-1 text-emerald-500">
+                          <Trophy className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase">Wins</span>
+                        </div>
+                        <span className="text-lg font-black text-emerald-500">{sessionStats.wins}</span>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                        <div className="flex items-center space-x-1 text-rose-500">
+                          <Bomb className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase">Losses</span>
+                        </div>
+                        <span className="text-lg font-black text-rose-500">{sessionStats.losses}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <Coins className="w-4 h-4 text-amber-400" />
+                        <span className="text-[11px] font-bold uppercase text-slate-300">Total Won</span>
+                      </div>
+                      <span className="text-base font-black text-amber-400">₹{sessionStats.totalWon}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] font-bold px-1">
+                      <span className="text-slate-400">Net this session</span>
+                      <span className={netResult >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
+                        {netResult >= 0 ? '+' : ''}
+                        ₹{netResult}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
-
         </div>
 
-        {/* Win/Loss Modal */}
-        {showPopupModal && popupMessage && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-            <div className="relative w-full max-w-md p-8 rounded-3xl bg-white dark:bg-black border-4 border-black dark:border-white text-black dark:text-white shadow-2xl text-center space-y-6">
-              
+        {/* Result modal */}
+        {showPopup && popup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+            <div className="relative w-full max-w-md p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl text-center space-y-6">
               <button
-                onClick={() => setShowPopupModal(false)}
-                className="absolute top-4 right-4 p-2 text-black dark:text-white hover:opacity-70 rounded-full"
+                onClick={() => setShowPopup(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="w-20 h-20 mx-auto rounded-3xl bg-black text-white dark:bg-white dark:text-black flex items-center justify-center shadow-xl">
-                {popupMessage.type === 'win' ? (
-                  <Trophy className="w-10 h-10 text-amber-400 animate-bounce" />
+              <div
+                className={`w-16 h-16 mx-auto rounded-3xl flex items-center justify-center shadow-xl ${
+                  popup.type === 'win' ? 'bg-emerald-600' : 'bg-slate-800'
+                }`}
+              >
+                {popup.type === 'win' ? (
+                  <Trophy className="w-8 h-8 text-amber-300" />
                 ) : (
-                  <Bomb className="w-10 h-10 text-rose-500 animate-pulse" />
+                  <Bomb className="w-8 h-8 text-rose-400" />
                 )}
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-2xl font-black font-['Space_Grotesk']">
-                  {popupMessage.title}
-                </h3>
-                <p className="text-sm opacity-80 leading-relaxed font-semibold">
-                  {popupMessage.desc}
-                </p>
+                <h3 className="text-2xl font-black font-['Space_Grotesk']">{popup.title}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{popup.desc}</p>
               </div>
 
               <div className="pt-2 flex flex-col gap-3">
                 <button
-                  onClick={handleEnterGame}
-                  className="w-full py-3.5 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-sm border-2 border-black dark:border-white transition-all shadow-lg"
+                  onClick={handleEnter}
+                  className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-lg transition-all"
                 >
-                  Play Again (₹10 Stake)
+                  Open a New Vault (₹{ENTRY_COST})
                 </button>
                 <button
-                  onClick={() => setShowPopupModal(false)}
-                  className="w-full py-2.5 rounded-xl bg-black/5 dark:bg-white/10 font-bold text-xs hover:opacity-80 transition-all"
+                  onClick={() => setShowPopup(false)}
+                  className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs hover:opacity-80 transition-all"
                 >
-                  Close & View Grid
+                  Close & View Vault
                 </button>
               </div>
-
             </div>
           </div>
         )}
-
       </div>
     </ProtectedRoute>
   );

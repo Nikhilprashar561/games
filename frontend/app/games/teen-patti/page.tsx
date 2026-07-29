@@ -349,7 +349,7 @@ function reducer(state: GameState, action: Action): GameState {
         currentTurn: 'user',
         turnTimer: TURN_SECONDS,
         result: null,
-        actionMessage: 'Cards dealt! All players paid boot. Round begins!',
+        actionMessage: 'Cards dealt! Boot deducted from all seats. Game begins!',
       };
 
     case 'SEE': {
@@ -362,7 +362,7 @@ function reducer(state: GameState, action: Action): GameState {
           ...state.players,
           [action.seat]: { ...p, isBlind: false, hasSeen: true, state: 'Seen' },
         },
-        actionMessage: `${p.name} flipped & saw cards!`,
+        actionMessage: `${p.name} flipped cards and is now SEEN!`,
       };
     }
 
@@ -390,26 +390,19 @@ function reducer(state: GameState, action: Action): GameState {
       const p = state.players[action.seat];
       if (!p || p.state === 'Folded') return state;
 
-      const prevSeatIndex = (state.turnSequence.indexOf(action.seat) - 1 + state.turnSequence.length) % state.turnSequence.length;
-      const prevSeat = state.turnSequence[prevSeatIndex];
-      const prevPlayer = state.players[prevSeat];
+      // Standard Teen Patti stake calculation:
+      // Blind bet = 1x currentStake (or 2x if raising)
+      // Seen bet  = 2x currentStake (or 4x if raising)
+      const cost = p.isBlind
+        ? (action.isRaise ? state.currentStake * 2 : state.currentStake)
+        : (action.isRaise ? state.currentStake * 4 : state.currentStake * 2);
 
-      let multiplier = 1;
-      if (p.isBlind) {
-        multiplier = prevPlayer && prevPlayer.isBlind ? 1 : 0.5;
-      } else {
-        multiplier = prevPlayer && prevPlayer.isBlind ? 2 : 1;
-      }
-
-      if (action.isRaise) multiplier *= 2;
-
-      const betAmt = Math.round(state.currentStake * multiplier);
+      const newStake = action.isRaise ? state.currentStake * 2 : state.currentStake;
       const players = {
         ...state.players,
-        [action.seat]: { ...p, totalBet: p.totalBet + betAmt },
+        [action.seat]: { ...p, totalBet: p.totalBet + cost },
       };
-      const pot = state.pot + betAmt;
-      const newStake = action.isRaise ? state.currentStake * 2 : state.currentStake;
+      const pot = state.pot + cost;
       const next = nextActiveSeat(players, state.turnSequence, action.seat);
 
       return {
@@ -419,7 +412,7 @@ function reducer(state: GameState, action: Action): GameState {
         currentStake: newStake,
         currentTurn: next,
         turnTimer: TURN_SECONDS,
-        actionMessage: `${p.name} placed ${action.isRaise ? 'Raise' : 'Chaal'} of ₹${betAmt}.`,
+        actionMessage: `${p.name} placed ${action.isRaise ? 'Raise' : 'Chaal'} of ₹${cost}.`,
       };
     }
 
@@ -431,15 +424,25 @@ function reducer(state: GameState, action: Action): GameState {
       const targetId = getPreviousActiveSeenPlayer(state.players, state.turnSequence, action.fromSeat);
       if (!targetId) return state;
 
+      // Deduct side show fee equal to current seen bet amount
+      const cost = state.currentStake * 2;
+      const players = {
+        ...state.players,
+        [action.fromSeat]: { ...fromP, totalBet: fromP.totalBet + cost },
+      };
+      const pot = state.pot + cost;
+
       return {
         ...state,
         phase: 'sideshow-pending',
+        players,
+        pot,
         activeSideShow: {
           fromPlayerId: action.fromSeat,
           toPlayerId: targetId,
           status: 'PENDING',
         },
-        actionMessage: `${fromP.name} requested Side Show with ${state.players[targetId]?.name}!`,
+        actionMessage: `${fromP.name} paid ₹${cost} & requested Side Show with ${state.players[targetId]?.name}!`,
       };
     }
 
@@ -450,15 +453,18 @@ function reducer(state: GameState, action: Action): GameState {
       const toP = state.players[toPlayerId];
 
       if (!action.accept) {
+        const next = nextActiveSeat(state.players, state.turnSequence, fromPlayerId);
         return {
           ...state,
           phase: 'playing',
+          currentTurn: next,
+          turnTimer: TURN_SECONDS,
           activeSideShow: null,
           actionMessage: `${toP?.name} rejected the Side Show. Game continues!`,
         };
       }
 
-      // secret evaluation
+      // Hand Evaluation for Side Show comparison
       const handFrom = evaluateHand(fromP.cards);
       const handTo = evaluateHand(toP.cards);
       const cmp = compareHands(handFrom, handTo);
@@ -466,7 +472,7 @@ function reducer(state: GameState, action: Action): GameState {
       let loserId = fromPlayerId;
       if (cmp > 0) loserId = toPlayerId;
       else if (cmp < 0) loserId = fromPlayerId;
-      else loserId = fromPlayerId; // tie: requester packs
+      else loserId = fromPlayerId; // Tie: requester folds
 
       const players = {
         ...state.players,
@@ -486,25 +492,36 @@ function reducer(state: GameState, action: Action): GameState {
         currentTurn: next,
         turnTimer: TURN_SECONDS,
         activeSideShow: null,
-        actionMessage: `Side Show accepted! ${state.players[loserId]?.name} lost hand comparison & packed!`,
+        actionMessage: `Side Show accepted! ${state.players[loserId]?.name} lost comparison & packed!`,
       };
     }
 
     case 'SHOW': {
       if (state.phase !== 'playing') return state;
+      const p = state.players[action.seat];
       const active = activeSeats(state.players, state.turnSequence);
       if (active.length !== 2 || !active.includes(action.seat)) return state;
+
+      // Show fee equals current bet amount
+      const cost = p ? (p.isBlind ? state.currentStake : state.currentStake * 2) : 0;
+      const players = {
+        ...state.players,
+        [action.seat]: { ...p, totalBet: p.totalBet + cost },
+      };
+      const pot = state.pot + cost;
+
       const [a, b] = active;
-      const handA = evaluateHand(state.players[a].cards);
-      const handB = evaluateHand(state.players[b].cards);
+      const handA = evaluateHand(players[a].cards);
+      const handB = evaluateHand(players[b].cards);
       const cmp = compareHands(handA, handB);
       const winner = cmp >= 0 ? a : b;
-      return finalizeRound(state, state.players, winner, 'showdown', { a, b, handA, handB });
+      return finalizeRound({ ...state, pot }, players, winner, 'showdown', { a, b, handA, handB });
     }
 
     case 'TICK': {
       if (state.phase !== 'playing') return state;
       if (state.turnTimer <= 1) {
+        // Auto-pack on turn timer expiration to prevent game freeze
         return reducer(state, { type: 'PACK', seat: state.currentTurn });
       }
       return { ...state, turnTimer: state.turnTimer - 1 };
@@ -693,6 +710,15 @@ export default function TeenPattiPage() {
         state.botNames[state.result.winnerId] || 'Opponent'
       );
     }
+
+    // Auto-start next round after 5 seconds if user balance allows
+    const autoNextTimer = setTimeout(() => {
+      if (user && (user.walletBalance || 0) >= state.bootAmount) {
+        startMatch();
+      }
+    }, 5000);
+
+    return () => clearTimeout(autoNextTimer);
   }, [state.phase, state.result]);
 
   const startMatch = async () => {
