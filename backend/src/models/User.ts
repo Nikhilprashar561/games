@@ -4,6 +4,8 @@ export interface IUser extends Document {
   name: string;
   email: string;
   walletBalance: number; // Real Money Balance in ₹ Rupees
+  demoBalance: number; // Demo Money Coins for Practice Play
+  role: 'user' | 'admin';
   upiId: string;
   avatar: string;
   isVerified: boolean;
@@ -30,7 +32,16 @@ const UserSchema: Schema = new Schema({
   },
   walletBalance: {
     type: Number,
-    default: 500, // ₹500 Default real money wallet balance
+    default: 0, // Default real money balance
+  },
+  demoBalance: {
+    type: Number,
+    default: 10000, // ₹10,000 Demo Coins for Practice Play
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
   },
   upiId: {
     type: String,

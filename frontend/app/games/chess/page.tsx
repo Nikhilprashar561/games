@@ -47,7 +47,7 @@ const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 export default function ChessPage() {
   const { user, updateWalletBalance, recordGameMatch } = useAuth();
   const ENTRY_COST = 25;
-  const WIN_REWARD = 45;
+  const WIN_REWARD = 44;
 
   const [board, setBoard] = useState<BoardMatrix>(INITIAL_BOARD);
   const [selectedSquare, setSelectedSquare] = useState<[number, number] | null>(null);

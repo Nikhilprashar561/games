@@ -243,7 +243,7 @@ function GamePawn({
 export default function SnakeLadderPage() {
   const { user, updateWalletBalance, recordGameMatch } = useAuth();
   const ENTRY_COST = 10;
-  const WIN_REWARD = 18;
+  const WIN_REWARD = 17.6;
   const DICE_SPIN_MS = 1800;
 
   const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);

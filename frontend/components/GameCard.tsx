@@ -4,14 +4,14 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { GameInfo } from '../types';
-import { Lock, Play, Users, Sparkles } from 'lucide-react';
+import { Lock, Play, Users, Sparkles, Coins, Wallet } from 'lucide-react';
 
 interface GameCardProps {
   game: GameInfo;
 }
 
 export const GameCard: React.FC<GameCardProps> = ({ game }) => {
-  const { user, openAuthModal } = useAuth();
+  const { user, openAuthModal, playMode } = useAuth();
   const router = useRouter();
 
   const handleCardClick = () => {
@@ -25,10 +25,10 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
   return (
     <div
       onClick={handleCardClick}
-      className="group relative cursor-pointer glass-card rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 transform hover:-translate-y-1 flex flex-col h-full"
+      className="group relative cursor-pointer glass-card rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 transform hover:-translate-y-1 flex flex-col h-full bg-slate-900"
     >
       {/* Top Image Box */}
-      <div className="relative aspect-[16/9] overflow-hidden bg-slate-900">
+      <div className="relative aspect-[16/9] overflow-hidden bg-slate-950">
         <img
           src={game.image}
           alt={game.title}
@@ -39,17 +39,22 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
 
-        {/* Protection Badge */}
-        <div className="absolute top-2.5 left-2.5 flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-md backdrop-blur-md">
+        {/* Protection / Mode Badge */}
+        <div className="absolute top-2.5 left-2.5 flex items-center space-x-1 text-[11px] font-bold shadow-md backdrop-blur-md">
           {!game.isProtected ? (
-            <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-full flex items-center space-x-1">
+            <span className="bg-emerald-500 text-white px-2.5 py-0.5 rounded-full flex items-center space-x-1">
               <Sparkles className="w-3 h-3" />
               <span>FREE PLAY</span>
             </span>
+          ) : playMode === 'DEMO' ? (
+            <span className="bg-amber-600/90 text-white border border-amber-400/40 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+              <Coins className="w-3 h-3 text-amber-300" />
+              <span>DEMO MODE</span>
+            </span>
           ) : (
-            <span className="bg-slate-900/80 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center space-x-1">
-              <Lock className="w-3 h-3 text-amber-400" />
-              <span>PROTECTED</span>
+            <span className="bg-emerald-600/90 text-white border border-emerald-400/40 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+              <Wallet className="w-3 h-3" />
+              <span>REAL CASH</span>
             </span>
           )}
         </div>
@@ -76,23 +81,28 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
               {game.category}
             </span>
+            {game.entryFee ? (
+              <span className="text-xs font-bold text-amber-400">
+                {playMode === 'REAL' ? `Fee: ₹${game.entryFee}` : `Demo Fee: 🪙${game.entryFee}`}
+              </span>
+            ) : null}
           </div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors font-['Space_Grotesk']">
+          <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors font-['Space_Grotesk']">
             {game.title}
           </h3>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
             {game.description}
           </p>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-semibold">
-          <span className="text-slate-500 dark:text-slate-400 text-[11px]">
-            {game.isProtected && !user ? 'Login Required' : 'Click to Play'}
+        <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold">
+          <span className="text-slate-400 text-[11px]">
+            {game.isProtected && !user ? 'Login Required' : `Play in ${playMode === 'REAL' ? 'Real Cash' : 'Demo Mode'}`}
           </span>
-          <span className="text-emerald-500 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center text-xs">
+          <span className="text-emerald-400 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center text-xs">
             Launch &rarr;
           </span>
         </div>

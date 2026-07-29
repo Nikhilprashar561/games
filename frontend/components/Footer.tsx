@@ -1,41 +1,55 @@
 'use client';
 
 import React from 'react';
-import { Gamepad2, Heart, Shield, Terminal } from 'lucide-react';
+import Link from 'next/link';
+import { Gamepad2, Heart, Shield, Terminal, Dices } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="w-full mt-auto border-t border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-[#05070b]/80 backdrop-blur-md transition-colors duration-300 py-8">
+    <footer className="w-full mt-auto border-t border-slate-800/80 bg-[#05070b]/95 backdrop-blur-xl transition-colors duration-300 py-6 sm:py-8 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           
-          {/* Logo & Copyright */}
-          <div className="flex items-center space-x-2">
-            <Gamepad2 className="w-5 h-5 text-emerald-500" />
-            <span className="text-sm font-extrabold text-slate-900 dark:text-white tracking-wider font-['Space_Grotesk']">
-              BAAZI BOARD &copy; {new Date().getFullYear()}
-            </span>
-          </div>
+          {/* Logo & Brand Copyright */}
+          <Link href="/" className="flex items-center justify-center space-x-2.5 cursor-pointer group">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-emerald-500/30 group-hover:border-emerald-400 flex items-center justify-center text-emerald-400 shadow-md transition-colors">
+              <Dices className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-sm sm:text-base font-black tracking-tight text-white font-['Space_Grotesk']">
+                BAAZI <span className="text-emerald-500">BOARD</span>
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">
+                &copy; {new Date().getFullYear()} All Rights Reserved
+              </span>
+            </div>
+          </Link>
 
-          {/* Quick Links */}
-          <div className="flex items-center space-x-6 text-xs font-bold text-slate-500 dark:text-slate-400">
-            <a href="#games-section" className="hover:text-emerald-500 transition-colors">Games</a>
-            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-            <span className="flex items-center space-x-1">
-              <Shield className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Safe & Secure</span>
-            </span>
-            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-            <span className="flex items-center space-x-1">
-              <Terminal className="w-3.5 h-3.5 text-emerald-500" />
+          {/* Quick Badges - Wrap gracefully on small mobile screens without bullet overlap */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs font-bold text-slate-300">
+            <a
+              href="#games-section"
+              className="hover:text-emerald-400 transition-colors flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700"
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>All Games</span>
+            </a>
+            
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <span>100% Safe & Secure</span>
+            </div>
+
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800">
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
               <span>Instant Multiplayer</span>
-            </span>
+            </div>
           </div>
 
           {/* Tagline */}
-          <div className="text-xs text-slate-400 flex items-center space-x-1 font-semibold">
+          <div className="text-xs text-slate-400 flex items-center justify-center space-x-1 font-semibold">
             <span>Built with</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-current animate-pulse" />
             <span>for Online Gamers</span>
           </div>
 

@@ -168,7 +168,7 @@ export default function ProfilePage() {
                   <span>Real Money Wallet</span>
                 </div>
                 <p className="text-3xl font-black text-emerald-400 mt-1 font-['Space_Grotesk']">
-                  ₹{user?.walletBalance || 500}
+                  ₹{user?.walletBalance ?? 0}
                 </p>
                 <p className="text-[10px] font-bold text-slate-400 mt-0.5">
                   UPI: {user?.upiId || 'user@paytm'}

@@ -3,12 +3,15 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IGameLog extends Document {
   userId: string;
   userEmail: string;
+  userName: string;
   gameSlug: string;
   gameTitle: string;
+  playMode: 'REAL' | 'DEMO';
+  entryFee: number;       // Entry fee paid by player (e.g. ₹10)
   result: 'WIN' | 'LOSS' | 'DRAW';
-  amountSpent: number; // in ₹ Rupees
-  amountWon: number;   // in ₹ Rupees
-  netAmount: number;   // in ₹ Rupees
+  amountWon: number;      // Payout received by player (e.g. ₹18 on WIN, ₹10 on DRAW, ₹0 on LOSS)
+  adminCommission: number;// Commission kept by admin (e.g. ₹2 on WIN, ₹10 on LOSS, ₹0 on DRAW)
+  netAmount: number;      // Player Net earnings (amountWon - entryFee)
   opponentName: string;
   playedAt: Date;
 }
@@ -23,6 +26,10 @@ const GameLogSchema: Schema = new Schema({
     type: String,
     required: true,
   },
+  userName: {
+    type: String,
+    default: 'Gamer',
+  },
   gameSlug: {
     type: String,
     required: true,
@@ -32,16 +39,25 @@ const GameLogSchema: Schema = new Schema({
     type: String,
     required: true,
   },
+  playMode: {
+    type: String,
+    enum: ['REAL', 'DEMO'],
+    default: 'REAL',
+  },
+  entryFee: {
+    type: Number,
+    default: 10,
+  },
   result: {
     type: String,
     enum: ['WIN', 'LOSS', 'DRAW'],
     required: true,
   },
-  amountSpent: {
+  amountWon: {
     type: Number,
     default: 0,
   },
-  amountWon: {
+  adminCommission: {
     type: Number,
     default: 0,
   },

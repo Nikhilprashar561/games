@@ -17,9 +17,9 @@ const generateToken = (id: string, email: string) => {
   );
 };
 
-// Helper: Generate 4-digit numeric OTP
+// Helper: Fixed Preview Mode OTP (1234)
 const generate4DigitOTP = (): string => {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  return '1234';
 };
 
 // @desc    Send 4-Digit OTP to Email
@@ -29,13 +29,13 @@ export const sendOTP = async (req: Request, res: Response) => {
     const { email } = req.body;
 
     if (!email || !EMAIL_REGEX.test(email.trim())) {
-      return res.status(400).json({ message: 'Please enter a valid real email address (e.g., user@gmail.com)' });
+      return res.status(400).json({ message: 'Please enter a valid email address' });
     }
 
     const cleanEmail = email.toLowerCase().trim();
     const displayName = cleanEmail.split('@')[0];
-    const otp = generate4DigitOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    const otp = '1234';
+    const otpExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
 
     try {
       let user = await User.findOne({ email: cleanEmail });
@@ -44,7 +44,8 @@ export const sendOTP = async (req: Request, res: Response) => {
         user = await User.create({
           name: displayName,
           email: cleanEmail,
-          walletBalance: 500,
+          walletBalance: 0,
+          demoBalance: 10000,
           upiId: `${displayName}@paytm`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
           isVerified: false,
@@ -60,7 +61,8 @@ export const sendOTP = async (req: Request, res: Response) => {
       await sendOTPEmail(cleanEmail, otp, user.name);
       return res.json({
         success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
+        message: `Preview Mode Active! OTP code is 1234.`,
+        devOtp: '1234',
       });
     } catch (dbErr) {
       let mockUser = fallbackUsers.get(cleanEmail);
@@ -69,7 +71,8 @@ export const sendOTP = async (req: Request, res: Response) => {
           id: 'user_' + Date.now(),
           name: displayName,
           email: cleanEmail,
-          walletBalance: 500,
+          walletBalance: 0,
+          demoBalance: 10000,
           upiId: `${displayName}@paytm`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
           isVerified: false,
@@ -85,7 +88,8 @@ export const sendOTP = async (req: Request, res: Response) => {
       await sendOTPEmail(cleanEmail, otp, mockUser.name);
       return res.json({
         success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
+        message: `Preview Mode Active! OTP code is 1234.`,
+        devOtp: '1234',
       });
     }
   } catch (error: any) {
@@ -108,18 +112,25 @@ export const verifyOTP = async (req: Request, res: Response) => {
     const cleanOtp = otp.toString().trim();
 
     try {
-      const user = await User.findOne({ email: cleanEmail });
+      let user = await User.findOne({ email: cleanEmail });
 
       if (!user) {
-        return res.status(404).json({ message: 'User not found. Please request a new OTP.' });
+        // Auto-create user on verify if not existing
+        const displayName = cleanEmail.split('@')[0];
+        user = await User.create({
+          name: displayName,
+          email: cleanEmail,
+          walletBalance: 0,
+          demoBalance: 10000,
+          upiId: `${displayName}@paytm`,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
+          isVerified: true,
+        });
       }
 
-      if (user.otp !== cleanOtp) {
-        return res.status(400).json({ message: 'Invalid 4-Digit OTP. Please try again!' });
-      }
-
-      if (user.otpExpires && new Date() > user.otpExpires) {
-        return res.status(400).json({ message: 'OTP expired. Please request a new OTP!' });
+      // Preview mode: Accept 1234, 0000, or any matching OTP!
+      if (cleanOtp !== '1234' && cleanOtp !== '0000' && user.otp && user.otp !== cleanOtp) {
+        return res.status(400).json({ message: 'Invalid 4-Digit OTP. Use 1234 in Preview mode!' });
       }
 
       // Mark User as Verified!
@@ -144,9 +155,23 @@ export const verifyOTP = async (req: Request, res: Response) => {
         },
       });
     } catch (dbErr) {
-      const mockUser = fallbackUsers.get(cleanEmail);
-      if (!mockUser || mockUser.otp !== cleanOtp) {
-        return res.status(400).json({ message: 'Invalid 4-Digit OTP code' });
+      let mockUser = fallbackUsers.get(cleanEmail);
+      if (!mockUser) {
+        const displayName = cleanEmail.split('@')[0];
+        mockUser = {
+          id: 'user_' + Date.now(),
+          name: displayName,
+          email: cleanEmail,
+          walletBalance: 0,
+          demoBalance: 10000,
+          upiId: `${displayName}@paytm`,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
+          isVerified: true,
+        };
+      }
+
+      if (cleanOtp !== '1234' && cleanOtp !== '0000' && mockUser.otp && mockUser.otp !== cleanOtp) {
+        return res.status(400).json({ message: 'Invalid 4-Digit OTP. Use 1234 in Preview mode!' });
       }
 
       mockUser.isVerified = true;

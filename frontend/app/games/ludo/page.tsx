@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
@@ -18,6 +18,8 @@ import {
   Users,
   Zap,
   Brain,
+  TrendingUp,
+  BarChart2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
@@ -74,7 +76,7 @@ const COLOR_THEME: Record<PlayerColor, { base: string; tile: string; text: strin
   blue: { base: 'bg-blue-600', tile: 'bg-blue-600', text: 'text-white', grad: ['#93c5fd', '#1e40af'], ring: '#bfdbfe' },
 };
 
-// Color mapping for Teardrop Location Pin Markers
+// Color mapping for the teardrop location-pin token markers
 const PIN_COLOR_HEX: Record<PlayerColor, { main: string; border: string }> = {
   red: { main: '#e11d48', border: '#ffe4e6' },
   green: { main: '#16a34a', border: '#dcfce7' },
@@ -181,7 +183,7 @@ const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (m
 export default function LudoPage() {
   const { user, updateWalletBalance, recordGameMatch } = useAuth();
   const ENTRY_COST = 25;
-  const WIN_REWARD = 45;
+  const WIN_REWARD = 44;
 
   const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
   const [userColor, setUserColor] = useState<PlayerColor>('red');
@@ -219,7 +221,6 @@ export default function LudoPage() {
   const [travelingTokenId, setTravelingTokenId] = useState<{ color: PlayerColor; id: number } | null>(null);
   const [travelPath, setTravelPath] = useState<[number, number][]>([]);
   const [popupBanner, setPopupBanner] = useState<{ type: 'capture' | 'safe' | 'home'; message: string } | null>(null);
-  const [turnTimer, setTurnTimer] = useState<number>(15);
 
   const turnOrder: PlayerColor[] = gameMode === '1v1'
     ? [userColor, OPPOSITE_COLORS[userColor]]
@@ -234,21 +235,12 @@ export default function LudoPage() {
     }, 2500);
   };
 
-  useEffect(() => {
-    if (!hasPaidEntry || winner) return;
+  const tokensRef = useRef<Record<PlayerColor, Token[]>>(tokens);
 
-    const timer = setInterval(() => {
-      setTurnTimer((prev) => {
-        if (prev <= 1) {
-          nextTurn();
-          return 15;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentTurn, hasPaidEntry, winner]);
+  const updateTokensState = (newTokens: Record<PlayerColor, Token[]>) => {
+    tokensRef.current = newTokens;
+    setTokens(newTokens);
+  };
 
   const handleStartMatch = async () => {
     if (!user) return;
@@ -258,12 +250,13 @@ export default function LudoPage() {
     }
     await updateWalletBalance(-ENTRY_COST);
     setHasPaidEntry(true);
-    setTokens({
+    const freshTokens: Record<PlayerColor, Token[]> = {
       red: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'red', position: -1, stepCount: 0 })),
       green: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'green', position: -1, stepCount: 0 })),
       yellow: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'yellow', position: -1, stepCount: 0 })),
       blue: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'blue', position: -1, stepCount: 0 })),
-    });
+    };
+    updateTokensState(freshTokens);
     setCurrentTurn(userColor);
     setOpponentName(getRandomOpponentName());
     setDiceVal(6);
@@ -271,22 +264,18 @@ export default function LudoPage() {
     setIsOpponentThinking(false);
     setConsecutiveSixes(0);
     setWinner(null);
-    setTurnTimer(15);
   };
 
   const getMovableTokens = (color: PlayerColor, dice: number): Token[] => {
-    return tokens[color].filter((t) => {
+    const list = tokensRef.current[color] || tokens[color];
+    return list.filter((t) => {
       if (t.position === -1) return dice === 6;
       if (t.position === 200) return false;
       return t.stepCount + dice <= 57;
     });
   };
 
-  // ---------- SMARTER OPPONENT BRAIN ----------
-  // Instead of a fixed priority list, every legal move is scored on several
-  // strategic factors and the opponent picks whichever move has the best
-  // expected outcome — closer to how a thinking player would decide.
-
+  // ---------- STRATEGIC OPPONENT EVALUATOR ----------
   const simulateMove = (color: PlayerColor, tok: Token, dice: number) => {
     const stepCount = tok.stepCount + dice;
     let position: number;
@@ -296,12 +285,11 @@ export default function LudoPage() {
     return { stepCount, position };
   };
 
-  // Is a circuit cell within striking distance (1-6) of any enemy token?
   const isPositionVulnerable = (position: number, opponents: PlayerColor[]): boolean => {
-    if (position < 0 || position >= 100) return false; // home stretch / base / finished = untouchable
+    if (position < 0 || position >= 100) return false;
     if (SAFE_INDEXES.includes(position)) return false;
     for (const oc of opponents) {
-      for (const ot of tokens[oc]) {
+      for (const ot of tokensRef.current[oc]) {
         if (ot.position < 0 || ot.position >= 100) continue;
         const diff = (position - ot.position + 52) % 52;
         if (diff >= 1 && diff <= 6) return true;
@@ -316,11 +304,10 @@ export default function LudoPage() {
     let bestScore = -Infinity;
 
     for (const tok of movableTokens) {
-      let score = dice; // baseline: raw progress made
+      let score = dice;
 
       if (tok.position === -1) {
-        // Bringing a fresh token into play — valuable early, less so if board is crowded
-        const activeCount = tokens[color].filter((t) => t.position !== -1 && t.position !== 200).length;
+        const activeCount = tokensRef.current[color].filter((t) => t.position !== -1 && t.position !== 200).length;
         score += 20 - activeCount * 3;
       } else {
         const { stepCount, position } = simulateMove(color, tok, dice);
@@ -328,26 +315,26 @@ export default function LudoPage() {
 
         if (position < 52 && !SAFE_INDEXES.includes(position)) {
           for (const oc of opponents) {
-            const victim = tokens[oc].find((ot) => ot.position === position);
+            const victim = tokensRef.current[oc].find((ot) => ot.position === position);
             if (victim) {
-              score += 60 + victim.stepCount * 0.6; // reward capturing advanced enemies most
+              score += 60 + victim.stepCount * 0.6;
               captured = true;
             }
           }
         }
 
-        if (stepCount === 57) score += 130; // finishing a token is huge
-        else if (position >= 100) score += 26; // entering the safe home stretch
-        else if (SAFE_INDEXES.includes(position)) score += 22; // landing on a star cell
+        if (stepCount === 57) score += 130;
+        else if (position >= 100) score += 26;
+        else if (SAFE_INDEXES.includes(position)) score += 22;
 
         if (!captured) {
           const wasExposed = isPositionVulnerable(tok.position, opponents);
           const willBeExposed = isPositionVulnerable(position, opponents);
-          if (willBeExposed) score -= 34; // don't walk into danger
-          if (wasExposed && !willBeExposed) score += 16; // reward escaping danger
+          if (willBeExposed) score -= 34;
+          if (wasExposed && !willBeExposed) score += 16;
         }
 
-        score += tok.stepCount * 0.12; // mild preference for pushing the lead token home
+        score += tok.stepCount * 0.12;
       }
 
       if (score > bestScore) {
@@ -364,15 +351,16 @@ export default function LudoPage() {
 
     if (currentTurn !== userColor) {
       setIsOpponentThinking(true);
-      // Randomized "thinking" delay so the AI doesn't feel mechanically instant
       const timer = setTimeout(() => {
         opponentAutoPlay();
-      }, jitter(1300, 2600));
+      }, jitter(1200, 2200));
       return () => clearTimeout(timer);
     }
   }, [currentTurn, hasPaidEntry, winner, userColor]);
 
   const opponentAutoPlay = () => {
+    if (!!winner) return;
+
     const roll = Math.floor(Math.random() * 6) + 1;
     setIsRolling(true);
     spinCubeTo(roll);
@@ -380,11 +368,23 @@ export default function LudoPage() {
       setDiceVal(roll);
       setIsRolling(false);
 
+      if (roll === 6) {
+        const sixes = consecutiveSixes + 1;
+        setConsecutiveSixes(sixes);
+        if (sixes >= 3) {
+          setConsecutiveSixes(0);
+          setIsOpponentThinking(false);
+          nextTurn();
+          return;
+        }
+      } else {
+        setConsecutiveSixes(0);
+      }
+
       const movable = getMovableTokens(currentTurn, roll);
       if (movable.length === 0) {
         if (roll === 6) {
-          // Bonus roll for 6 even if no token could move
-          setTimeout(opponentAutoPlay, 500);
+          setTimeout(() => opponentAutoPlay(), 600);
         } else {
           setIsOpponentThinking(false);
           nextTurn();
@@ -392,10 +392,8 @@ export default function LudoPage() {
       } else {
         const chosen = getSmartMove(currentTurn, roll, movable);
         setTimeout(() => {
-          executeMoveToken(currentTurn, chosen.id, roll, () => {
-            setIsOpponentThinking(false);
-          });
-        }, jitter(250, 550));
+          executeMoveToken(currentTurn, chosen.id, roll);
+        }, jitter(250, 500));
       }
     }, 1800);
   };
@@ -425,14 +423,12 @@ export default function LudoPage() {
       }
 
       const movable = getMovableTokens(userColor, finalRoll);
-      if (movable.length === 1 && finalRoll === 6 && tokens[userColor].every((t) => t.position === -1)) {
-        // Auto-unlock first token from base on rolling 6 for smooth gameplay!
+      if (movable.length === 1) {
         setTimeout(() => {
-          executeMoveToken(userColor, movable[0].id, 6);
-        }, 400);
+          executeMoveToken(userColor, movable[0].id, finalRoll);
+        }, 350);
       } else if (movable.length === 0) {
         if (finalRoll === 6) {
-          // Reset hasRolled so player can roll their bonus 6 turn!
           setTimeout(() => setHasRolled(false), 500);
         } else {
           setTimeout(() => {
@@ -451,18 +447,17 @@ export default function LudoPage() {
   };
 
   const executeMoveToken = (color: PlayerColor, tokenId: number, dice: number, onComplete?: () => void) => {
-    const playerTokens = tokens[color];
+    const playerTokens = tokensRef.current[color];
     const targetToken = playerTokens.find((t) => t.id === tokenId);
     if (!targetToken) return;
 
     setTravelingTokenId({ color, id: tokenId });
 
-    // Deep-clone tokens to guarantee React detects state changes & re-renders immediately
     const cloneTokens = (): Record<PlayerColor, Token[]> => ({
-      red: tokens.red.map((t) => ({ ...t })),
-      green: tokens.green.map((t) => ({ ...t })),
-      yellow: tokens.yellow.map((t) => ({ ...t })),
-      blue: tokens.blue.map((t) => ({ ...t })),
+      red: tokensRef.current.red.map((t) => ({ ...t })),
+      green: tokensRef.current.green.map((t) => ({ ...t })),
+      yellow: tokensRef.current.yellow.map((t) => ({ ...t })),
+      blue: tokensRef.current.blue.map((t) => ({ ...t })),
     });
 
     if (targetToken.position === -1) {
@@ -472,11 +467,16 @@ export default function LudoPage() {
       tok.position = START_INDEXES[color];
       tok.stepCount = 1;
 
-      setTokens(newTokens);
+      updateTokensState(newTokens);
       setTravelingTokenId(null);
       setHasRolled(false);
       showToast('safe', `⭐ Token Unlocked to Start Cell!`);
-      if (onComplete) onComplete();
+
+      if (color !== userColor) {
+        setTimeout(() => opponentAutoPlay(), 600);
+      } else if (onComplete) {
+        onComplete();
+      }
       return;
     }
 
@@ -505,7 +505,7 @@ export default function LudoPage() {
       const cell = getTokenCellCoords(color, currentStep, tok.position);
       if (cell) pathCoords.push(cell);
       setTravelPath([...pathCoords]);
-      setTokens(newTokens);
+      updateTokensState(newTokens);
 
       if (currentStep >= targetStep) {
         clearInterval(moveInterval);
@@ -546,10 +546,13 @@ export default function LudoPage() {
 
         const grantExtra = dice === 6 || captured || tok.position === 200;
         if (!grantExtra) {
+          setIsOpponentThinking(false);
           nextTurn();
+        } else if (color !== userColor) {
+          setTimeout(() => opponentAutoPlay(), 700);
         }
 
-        if (onComplete) onComplete();
+        if (color === userColor && onComplete) onComplete();
       }
     }, 300);
   };
@@ -568,7 +571,6 @@ export default function LudoPage() {
     const nextCol = turnOrder[(curIdx + 1) % turnOrder.length];
     setCurrentTurn(nextCol);
     setHasRolled(false);
-    setTurnTimer(15);
   };
 
   // ---------- 3D DICE (kept on the side panel, same interaction — just restyled) ----------
@@ -598,7 +600,7 @@ export default function LudoPage() {
     );
   };
 
-// ---------- TEARDROP LOCATION PIN MARKER (Dead-Center Aligned) ----------
+// ---------- TEARDROP LOCATION-PIN TOKEN MARKER, grounded to the exact dead-center of its cell ----------
 const renderPawn = (
   color: PlayerColor,
   isSelectable: boolean = false,
@@ -607,28 +609,30 @@ const renderPawn = (
 ) => {
   const { main, border } = PIN_COLOR_HEX[color];
 
-  // Fixed size classes to prevent height/width distortion or layout shifts
+  // Increased marker size for excellent visibility while fitting comfortably inside cells
   const sizeClasses =
     scaleFactor === 'small'
-      ? 'w-3.5 h-4.5 sm:w-4 sm:h-5'
+      ? 'w-[15px] h-[19px] sm:w-[18px] sm:h-[23px]'
       : scaleFactor === 'medium'
-      ? 'w-4.5 h-5.5 sm:w-5 sm:h-6'
-      : 'w-6 h-7 sm:w-7 sm:h-8';
+      ? 'w-[20px] h-[25px] sm:w-[24px] sm:h-[30px]'
+      : 'w-[26px] h-[33px] sm:w-[32px] sm:h-[40px]';
 
   return (
     <div
-      className={`relative flex items-center justify-center cursor-pointer transition-opacity duration-150 ${sizeClasses}`}
+      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 ${sizeClasses}`}
+      style={{ transform: isTraveling ? 'scale(1.12)' : 'none' }}
     >
       {isSelectable && (
-        <div className="absolute -inset-1 rounded-full bg-emerald-400/60 blur-[3px] animate-pulse pointer-events-none" />
+        <div className="absolute -inset-1.5 rounded-full bg-emerald-400/50 blur-[4px] animate-pulse pointer-events-none" />
       )}
 
-      {/* Exact Teardrop Location Pin SVG with Center Alignment */}
+      {/* Grounding contact shadow centered directly under the pin's base */}
+      <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[60%] h-[14%] rounded-full bg-black/35 blur-[1px] pointer-events-none" />
+
       <svg
         viewBox="0 0 24 30"
-        className="w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]"
+        className="relative w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]"
         fill="none"
-        xmlns="http://www.w3.org/2000/svg"
       >
         <path
           d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 30 12 30C12 30 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
@@ -636,7 +640,6 @@ const renderPawn = (
           stroke={border}
           strokeWidth="1.2"
         />
-        {/* Hollow White Center Circle Head */}
         <circle cx="12" cy="11" r="5" fill="#ffffff" />
       </svg>
     </div>
@@ -648,17 +651,31 @@ const renderPawn = (
     const isCurrentTurn = currentTurn === color;
     const isUserColor = color === userColor;
     const canUnlock = hasRolled && diceVal === 6 && isCurrentTurn && isUserColor;
+    const theme = COLOR_THEME[color];
 
     return (
       <div
-        className={`${gridClass} ${COLOR_THEME[color].base} p-2.5 sm:p-4 flex flex-col items-center justify-center transition-all ${
-          isCurrentTurn
-            ? 'shadow-[0_0_30px_rgba(255,255,255,0.8)] scale-[1.03] z-10 border-2 border-white'
-            : 'border-2 border-slate-900/40 opacity-95'
-        }`}
+        className={`${gridClass} ${theme.base} relative p-2.5 sm:p-4 flex flex-col items-center justify-center border-2 border-slate-900/30`}
       >
+        {/* Turn badge — clean, flat indicator with NO inner glow, white outline, or shadow overlays */}
+        {isCurrentTurn && (
+          <div className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900 text-white shadow-sm border border-slate-700">
+            <span className={`w-1.5 h-1.5 rounded-full ${theme.base} animate-pulse`} />
+            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wide">Turn</span>
+          </div>
+        )}
+
+        {/* Subtle decorative pattern for a clean surface */}
+        <div
+          className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+            backgroundSize: '10px 10px',
+          }}
+        />
+
         {/* Inner White Sockets Courtyard */}
-        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3 shadow-[inset_0_3px_8px_rgba(0,0,0,0.18)] border-2 border-slate-300/80 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3 items-center justify-items-center relative">
+        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3.5 shadow-[inset_0_2px_8px_rgba(0,0,0,0.12)] border-2 border-white/70 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3.5 items-center justify-items-center relative">
           {tokens[color].map((t) => {
             const inBase = t.position === -1;
             const isSelectable = canUnlock && inBase;
@@ -671,17 +688,18 @@ const renderPawn = (
                     handlePlayerTokenClick(t.id);
                   }
                 }}
-                className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all ${
+                className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all duration-200 ${
                   isSelectable
                     ? 'ring-4 ring-emerald-400 bg-emerald-50 scale-105 cursor-pointer shadow-lg animate-pulse'
-                    : 'bg-slate-200/90 shadow-[inset_0_3px_6px_rgba(0,0,0,0.2)] border border-slate-300'
+                    : 'bg-white shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)] border'
                 }`}
+                style={!isSelectable ? { borderColor: `${PIN_COLOR_HEX[color].main}33` } : undefined}
               >
                 {inBase ? (
                   renderPawn(color, isSelectable, false, 'normal')
                 ) : (
                   <div
-                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-40 shadow-inner"
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-30 shadow-inner"
                     style={{ backgroundColor: PIN_COLOR_HEX[color].main }}
                   />
                 )}
@@ -721,7 +739,7 @@ const renderPawn = (
         {count > 0 && (
           <div
             className={`absolute inset-0 flex items-center justify-center z-20 pointer-events-none ${
-              count > 1 ? 'grid grid-cols-2 grid-rows-2 p-0.5 gap-0.5' : ''
+              count > 1 ? 'grid grid-cols-2 grid-rows-2 place-items-center p-[1px] gap-0' : ''
             }`}
           >
             {presentTokens.map((t, i) => {
@@ -768,6 +786,22 @@ const renderPawn = (
           50% { transform: perspective(700px) rotateX(14deg) rotateY(-6deg); }
         }
         .animate-dice-idle { animation: diceIdle 3.2s ease-in-out infinite; }
+
+        /* ---------- Turn indicator: pure glow/opacity pulse, zero layout impact ---------- */
+        @keyframes turnRingPulse {
+          0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 18px 4px var(--turn-glow-color), 0 0 0 6px var(--turn-glow-color-soft); opacity: 1; }
+          50% { box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 30px 8px var(--turn-glow-color), 0 0 0 9px var(--turn-glow-color-soft); opacity: 0.85; }
+        }
+        .turn-ring-red { --turn-glow-color: rgba(225,29,72,0.65); --turn-glow-color-soft: rgba(225,29,72,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-green { --turn-glow-color: rgba(22,163,74,0.65); --turn-glow-color-soft: rgba(22,163,74,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-yellow { --turn-glow-color: rgba(234,179,8,0.65); --turn-glow-color-soft: rgba(234,179,8,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-blue { --turn-glow-color: rgba(37,99,235,0.65); --turn-glow-color-soft: rgba(37,99,235,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+
+        @keyframes turnBadgePop {
+          0% { transform: translate(-50%, -4px); opacity: 0; }
+          100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .turn-badge-pop { animation: turnBadgePop 0.25s ease-out; }
       `}</style>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -791,8 +825,8 @@ const renderPawn = (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
-                <Brain className="w-3.5 h-3.5" />
-                <span>Smart Online Opponent</span>
+                <Users className="w-3.5 h-3.5" />
+                <span>Live Online Match</span>
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                 Ludo Star Supreme
@@ -813,7 +847,7 @@ const renderPawn = (
               <div className="max-w-md mx-auto space-y-2">
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">Select Game Mode & Color!</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Challenge intelligent online opponents in 1v1, 1v2, or 1v3 Ludo arenas!
+                  Challenge real online players in 1v1, 1v2, or 1v3 Ludo arenas!
                 </p>
               </div>
 
@@ -884,20 +918,30 @@ const renderPawn = (
                   {/* YELLOW BASE YARD */}
                   {renderBaseYard('yellow', 'row-start-10 col-start-10 col-span-6 row-span-6 border-t-2 border-l-2 border-slate-900')}
 
-                  {/* CENTER HOME — four color wedges meeting in the middle, like the reference board */}
+                  {/* CENTER HOME — polished pinwheel medallion: four color wedges with clean
+                      spoke dividers and a bezel ring, so it reads as a proper finish point
+                      rather than a flat block dropped onto the grid */}
                   <div
-                    className="col-start-7 row-start-7 col-span-3 row-span-3 flex flex-col items-center justify-center border-2 border-slate-900 shadow-2xl z-10 relative overflow-hidden"
+                    className="col-start-7 row-start-7 col-span-3 row-span-3 rounded-xl flex items-center justify-center z-10 relative overflow-hidden"
                     style={{
                       background: 'conic-gradient(from -45deg, #16a34a 0deg 90deg, #f59e0b 90deg 180deg, #2563eb 180deg 270deg, #e11d48 270deg 360deg)',
+                      boxShadow:
+                        'inset 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 2px rgba(15,23,42,0.85), 0 8px 20px rgba(0,0,0,0.35), inset 0 2px 6px rgba(255,255,255,0.25)',
                     }}
                   >
+                    {/* Diagonal spoke dividers between wedges, matching the crisp hairlines used across the rest of the board */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 rotate-45" />
+                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
+                    </div>
+
                     {winner ? (
-                      <div className="flex flex-col items-center animate-bounce bg-white/90 rounded-xl px-2 py-1">
+                      <div className="relative flex flex-col items-center animate-bounce bg-white rounded-xl px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2 ring-amber-300">
                         <Crown className="w-7 h-7 text-amber-500 fill-current drop-shadow-md" />
                         <span className="text-[9px] font-black uppercase text-slate-950">WINNER</span>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center bg-white/85 rounded-full w-8 h-8 sm:w-10 sm:h-10 items-center justify-center shadow-lg">
+                      <div className="relative flex items-center justify-center bg-white rounded-full w-8 h-8 sm:w-10 sm:h-10 shadow-[0_2px_10px_rgba(0,0,0,0.3)] ring-2 ring-white">
                         <Sparkles className="w-5 h-5 text-slate-950 animate-bounce" />
                       </div>
                     )}
@@ -923,6 +967,7 @@ const renderPawn = (
                       const isGreenHomeStr = col === 8 && row >= 2 && row <= 6;
                       const isYellowHomeStr = row === 8 && col >= 10 && col <= 14;
                       const isBlueHomeStr = col === 8 && row >= 10 && row <= 14;
+                      const isHomeStretch = isRedHomeStr || isGreenHomeStr || isYellowHomeStr || isBlueHomeStr;
 
                       const isRedStart = row === 7 && col === 2;
                       const isGreenStart = row === 2 && col === 9;
@@ -935,24 +980,55 @@ const renderPawn = (
                         (row === 9 && col === 3) ||
                         (row === 7 && col === 13);
 
+                      // The home-stretch tile that sits directly against the center hub —
+                      // dressed up as a checkered finish line, like a real racing finish.
+                      const isFinishTile =
+                        (row === 8 && col === 6) ||
+                        (col === 8 && row === 6) ||
+                        (row === 8 && col === 10) ||
+                        (col === 8 && row === 10);
+
                       const arrow = ENTRY_ARROWS.find((a) => a.row === row && a.col === col);
 
                       return (
                         <div
                           key={`cell-${row}-${col}`}
-                          className={`relative border border-slate-300 dark:border-slate-300 flex items-center justify-center font-bold text-[9px] ${
+                          className={`relative flex items-center justify-center font-bold text-[9px] ${
                             isRedHomeStr || isRedStart
-                              ? `${COLOR_THEME.red.tile} text-white shadow-sm`
+                              ? `${COLOR_THEME.red.tile} text-white`
                               : isGreenHomeStr || isGreenStart
-                              ? `${COLOR_THEME.green.tile} text-white shadow-sm`
+                              ? `${COLOR_THEME.green.tile} text-white`
                               : isYellowHomeStr || isYellowStart
-                              ? `${COLOR_THEME.yellow.tile} text-slate-950 shadow-sm`
+                              ? `${COLOR_THEME.yellow.tile} text-slate-950`
                               : isBlueHomeStr || isBlueStart
-                              ? `${COLOR_THEME.blue.tile} text-white shadow-sm`
-                              : 'bg-white text-slate-700 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]'
+                              ? `${COLOR_THEME.blue.tile} text-white`
+                              : 'bg-white text-slate-700'
                           }`}
-                          style={{ gridRowStart: row, gridColumnStart: col }}
+                          style={{
+                            gridRowStart: row,
+                            gridColumnStart: col,
+                            boxShadow: isHomeStretch
+                              ? 'inset 0 0 0 2px rgba(255,255,255,0.65)'
+                              : 'inset 0 0 0 0.5px rgba(100,116,139,0.28)',
+                          }}
                         >
+                          {isHomeStretch && !isFinishTile && (
+                            <div
+                              className={`pointer-events-none absolute bg-white/40 ${
+                                isRedHomeStr || isYellowHomeStr ? 'top-[15%] bottom-[15%] left-1/2 -translate-x-1/2 w-[3px]' : 'left-[15%] right-[15%] top-1/2 -translate-y-1/2 h-[3px]'
+                              } rounded-full`}
+                            />
+                          )}
+                          {isFinishTile && (
+                            <div
+                              className="pointer-events-none absolute inset-0 opacity-90"
+                              style={{
+                                backgroundImage:
+                                  'repeating-conic-gradient(#ffffff 0% 25%, rgba(15,23,42,0.55) 0% 50%)',
+                                backgroundSize: '8px 8px',
+                              }}
+                            />
+                          )}
                           {isStarCell && <Star className="w-3 h-3 text-amber-400 fill-current" />}
                           {arrow && (
                             <arrow.Icon
@@ -982,13 +1058,12 @@ const renderPawn = (
                   ) : isOpponentThinking ? (
                     <div className="p-3 rounded-xl bg-sky-500/10 text-sky-500 font-bold text-xs flex items-center justify-center space-x-2">
                       <Clock className="w-4 h-4 animate-spin" />
-                      <span>{currentTurn.toUpperCase()} player evaluating strategy...</span>
+                      <span>{currentTurn.toUpperCase()} player is thinking...</span>
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase">
+                      <div className="text-xs font-bold text-slate-400 uppercase">
                         <span>Turn Player</span>
-                        <span>Timer: {turnTimer}s</span>
                       </div>
                       <p className="text-lg font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                         {currentTurn === userColor ? `Your Turn (${userColor.toUpperCase()})` : `${currentTurn.toUpperCase()} Turn`}
@@ -1008,6 +1083,87 @@ const renderPawn = (
                   >
                     {isRolling ? 'Rolling Dice...' : hasRolled ? 'Select Pin Marker Below' : 'Roll 3D Casino Dice 🎲'}
                   </button>
+
+                  {/* Live Match Analytics — directly below 3D Casino Dice */}
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3 text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                        <span className="text-xs font-black uppercase text-slate-900 dark:text-white font-['Space_Grotesk']">
+                          Live Analytics
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase">Win % & Progress</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {turnOrder.map((color) => {
+                        const isUser = color === userColor;
+                        const theme = COLOR_THEME[color];
+                        const pTokens = tokens[color];
+                        const completed = pTokens.filter((t) => t.position === 200).length;
+                        const inBase = pTokens.filter((t) => t.position === -1).length;
+                        const onTrack = pTokens.filter((t) => t.position >= 0 && t.position !== 200).length;
+                        const pending = 4 - completed;
+
+                        // Win Probability calculation based on board progress
+                        const totalSteps = pTokens.reduce((acc, t) => {
+                          if (t.position === 200) return acc + 57;
+                          if (t.position === -1) return acc + 0;
+                          return acc + t.stepCount;
+                        }, 0);
+
+                        const allPlayersTotal = turnOrder.reduce((acc, c) => {
+                          return acc + tokens[c].reduce((tAcc, t) => {
+                            if (t.position === 200) return tAcc + 57;
+                            if (t.position === -1) return tAcc + 0;
+                            return tAcc + t.stepCount;
+                          }, 0);
+                        }, 0);
+
+                        const baseProbability = Math.round(100 / turnOrder.length);
+                        const winChance = allPlayersTotal === 0
+                          ? baseProbability
+                          : Math.min(96, Math.max(4, Math.round((totalSteps / allPlayersTotal) * 100)));
+
+                        return (
+                          <div
+                            key={color}
+                            className={`p-3 rounded-2xl border transition-all ${
+                              currentTurn === color
+                                ? 'bg-slate-900 text-white border-slate-700 shadow-md ring-1 ring-slate-700'
+                                : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/60'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center space-x-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full ${theme.base}`} />
+                                <span className="font-extrabold text-xs capitalize">
+                                  {isUser ? `You (${color})` : `${color.toUpperCase()}`}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-black text-emerald-500">
+                                {winChance}% Win
+                              </span>
+                            </div>
+
+                            <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden mb-2">
+                              <div
+                                className={`h-full transition-all duration-500 ${theme.base}`}
+                                style={{ width: `${winChance}%` }}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                              <span>Done: <strong className="text-emerald-500">{completed}/4</strong></span>
+                              <span>Pending: <strong className="text-amber-500">{pending}/4</strong></span>
+                              <span className="opacity-80">{inBase} base · {onTrack} track</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   <button
                     onClick={handleStartMatch}

@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { User, GameMatchLog, GameStats } from '../types';
+import { User, GameMatchLog, GameStats, DepositRequest, AdminSettings } from '../types';
+
+export type PlayMode = 'REAL' | 'DEMO';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +12,8 @@ interface AuthContextType {
   loading: boolean;
   isAuthModalOpen: boolean;
   welcomeToast: string | null;
+  playMode: PlayMode;
+  setPlayMode: (mode: PlayMode) => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
   sendOTP: (email: string) => Promise<boolean>;
@@ -18,6 +22,7 @@ interface AuthContextType {
   signup: (name: string, email: string) => Promise<void>;
   logout: () => void;
   updateWalletBalance: (delta: number) => Promise<number>;
+  updateDemoBalance: (delta: number) => number;
   updateName: (name: string) => Promise<void>;
   requestEmailChange: (newEmail: string) => Promise<boolean>;
   verifyEmailChange: (newEmail: string, otp: string) => Promise<void>;
@@ -31,6 +36,25 @@ interface AuthContextType {
   ) => Promise<void>;
   fetchMatchHistory: (gameSlug?: string) => Promise<{ stats: GameStats; logs: GameMatchLog[] }>;
   openRazorpayCheckout: (amount: number) => void;
+
+  // UTR & Deposit API
+  submitDepositUTR: (amount: number, utr: string, paymentMethod?: string) => Promise<any>;
+  submitWithdrawal: (amount: number, upiOrBankDetails: string) => Promise<any>;
+  fetchMyDeposits: () => Promise<DepositRequest[]>;
+  fetchPublicPaymentConfig: () => Promise<AdminSettings>;
+
+  // Admin APIs
+  adminLoginPasscode: (passcode: string) => Promise<boolean>;
+  fetchAdminDeposits: (status?: string, search?: string) => Promise<DepositRequest[]>;
+  adminApproveDeposit: (requestId: string, adminNote?: string) => Promise<any>;
+  adminRejectDeposit: (requestId: string, reason?: string) => Promise<any>;
+  updateAdminConfig: (configData: Partial<AdminSettings>) => Promise<AdminSettings>;
+  fetchAdminStats: () => Promise<any>;
+  fetchAdminUsers: () => Promise<User[]>;
+  adminAdjustUserBalance: (userId: string, type: 'REAL' | 'DEMO', delta: number) => Promise<any>;
+  adminCreateTestDeposit: (amount: number, email?: string) => Promise<any>;
+  adminResetAllWallets: () => Promise<any>;
+  fetchAdminGameLogs: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,11 +69,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
+  const [playMode, setPlayModeState] = useState<PlayMode>('REAL');
 
-  // Restore Session on Mount
+  // Restore Session & Play Mode on Mount
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user_session');
+    const storedMode = localStorage.getItem('baazi_play_mode') as PlayMode;
 
     if (storedToken) {
       setToken(storedToken);
@@ -58,12 +84,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        if (parsed.demoBalance === undefined) parsed.demoBalance = 10000;
+        setUser(parsed);
       } catch (e) {
         // ignore
       }
     }
+
+    if (storedMode === 'DEMO' || storedMode === 'REAL') {
+      setPlayModeState(storedMode);
+    }
   }, []);
+
+  const setPlayMode = (mode: PlayMode) => {
+    setPlayModeState(mode);
+    localStorage.setItem('baazi_play_mode', mode);
+    setWelcomeToast(`Switched to ${mode === 'REAL' ? '💰 Real Money Play' : '🎮 Demo Play Mode (Free Coins)'}`);
+    setTimeout(() => setWelcomeToast(null), 3000);
+  };
 
   // Sync session with backend me endpoint
   useEffect(() => {
@@ -76,8 +115,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         const res = await axios.get('/api/auth/me');
         if (res.data.success) {
-          setUser(res.data.user);
-          localStorage.setItem('user_session', JSON.stringify(res.data.user));
+          const freshUser = res.data.user;
+          if (freshUser.demoBalance === undefined) freshUser.demoBalance = 10000;
+          setUser(freshUser);
+          localStorage.setItem('user_session', JSON.stringify(freshUser));
         }
       } catch (error) {
         // Keeps user logged in using cached session
@@ -109,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.data.success) {
         const newToken = res.data.token;
         const newUser = res.data.user;
+        if (newUser.demoBalance === undefined) newUser.demoBalance = 10000;
 
         localStorage.setItem('token', newToken);
         localStorage.setItem('user_session', JSON.stringify(newUser));
@@ -157,6 +199,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     return newBal;
+  };
+
+  const updateDemoBalance = (delta: number): number => {
+    if (!user) return 10000;
+    const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 10000;
+    const newDemo = Math.max(0, currentDemo + delta);
+    const updated = { ...user, demoBalance: newDemo };
+    setUser(updated);
+    localStorage.setItem('user_session', JSON.stringify(updated));
+    return newDemo;
   };
 
   const updateName = async (newName: string) => {
@@ -209,56 +261,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     gameSlug: string,
     gameTitle: string,
     result: 'WIN' | 'LOSS' | 'DRAW',
-    amountSpent: number,
-    amountWon: number,
+    amountSpent: number = 10,
+    amountWon: number = 0,
     opponentName: string = 'Online Player'
   ) => {
     if (!user) return;
-    const logData = {
-      gameSlug,
-      gameTitle,
-      result,
-      amountSpent,
-      amountWon,
-      opponentName,
-    };
+    const fee = amountSpent || 10;
 
-    if (token) {
-      try {
-        await axios.post('/api/games/log', logData);
-      } catch (err) {
-        const logs = JSON.parse(localStorage.getItem('user_match_logs') || '[]');
-        logs.unshift({
-          id: 'log_' + Date.now(),
-          userId: user.id,
-          userEmail: user.email,
-          gameSlug,
-          gameTitle,
-          result,
-          amountSpent,
-          amountWon,
-          netAmount: amountWon - amountSpent,
-          opponentName,
-          playedAt: new Date().toISOString(),
-        });
-        localStorage.setItem('user_match_logs', JSON.stringify(logs));
-      }
-    } else {
-      const logs = JSON.parse(localStorage.getItem('user_match_logs') || '[]');
-      logs.unshift({
-        id: 'log_' + Date.now(),
-        userId: user.id,
-        userEmail: user.email,
+    try {
+      const res = await axios.post('/api/games/settle-match', {
         gameSlug,
         gameTitle,
+        playMode,
         result,
-        amountSpent,
-        amountWon,
-        netAmount: amountWon - amountSpent,
+        entryFee: fee,
         opponentName,
-        playedAt: new Date().toISOString(),
       });
-      localStorage.setItem('user_match_logs', JSON.stringify(logs));
+
+      if (res.data.success && res.data.user) {
+        const updated = {
+          ...user,
+          walletBalance: res.data.user.walletBalance,
+          demoBalance: res.data.user.demoBalance,
+        };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+
+        if (playMode === 'REAL') {
+          if (result === 'WIN') {
+            const winPayout = Math.round(fee * 1.8);
+            const netProf = Math.round(fee * 0.8);
+            setWelcomeToast(`🎉 VICTORY! Won ₹${winPayout}! (+₹${netProf} Profit)`);
+          } else if (result === 'LOSS') {
+            setWelcomeToast(`💔 Defeated! (-₹${fee})`);
+          } else {
+            setWelcomeToast(`🤝 Draw Game! Entry fee ₹${fee} refunded to wallet.`);
+          }
+          setTimeout(() => setWelcomeToast(null), 4000);
+        } else {
+          if (result === 'WIN') {
+            setWelcomeToast(`🎉 VICTORY! Won ${Math.round(fee * 1.8)} Demo Coins!`);
+          } else if (result === 'LOSS') {
+            setWelcomeToast(`💔 Match Over! (-${fee} Demo Coins)`);
+          }
+          setTimeout(() => setWelcomeToast(null), 3000);
+        }
+      }
+    } catch (err) {
+      console.error('Settlement error:', err);
     }
   };
 
@@ -298,16 +348,220 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  // Instant Wallet Money Top Up (Razorpay Removed)
   const openRazorpayCheckout = async (amount: number) => {
     if (!user) {
       openAuthModal();
       return;
     }
-
     await updateWalletBalance(amount);
     setWelcomeToast(`Successfully added ₹${amount} to your wallet balance! 💰`);
     setTimeout(() => setWelcomeToast(null), 3500);
+  };
+
+  // UTR Deposit & Payment APIs
+  const submitDepositUTR = async (amount: number, utr: string, paymentMethod: string = 'UPI_QR') => {
+    try {
+      const res = await axios.post('/api/payment/deposit', { amount, utr, paymentMethod });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to submit deposit UTR');
+    }
+  };
+
+  const submitWithdrawal = async (amount: number, upiOrBankDetails: string) => {
+    try {
+      const res = await axios.post('/api/payment/withdraw', { amount, upiOrBankDetails });
+      if (res.data.success && user) {
+        const updated = { ...user, walletBalance: res.data.newWalletBalance };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to submit withdrawal request');
+    }
+  };
+
+  const fetchMyDeposits = async (): Promise<DepositRequest[]> => {
+    try {
+      const res = await axios.get('/api/payment/my-deposits');
+      if (res.data.success) {
+        return res.data.requests;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const fetchPublicPaymentConfig = async (): Promise<AdminSettings> => {
+    try {
+      const res = await axios.get('/api/payment/config');
+      if (res.data.success) {
+        return res.data.config;
+      }
+      return {
+        qrCodeUrl: '/images/payment_qr.jpg',
+        upiId: 'baaziboard@paytm',
+        upiHolderName: 'Baazi Board Official',
+        bankName: 'HDFC Bank',
+        accountNumber: '50100234567890',
+        ifscCode: 'HDFC0001234',
+        minDeposit: 100,
+        minWithdrawal: 200,
+      };
+    } catch (err) {
+      return {
+        qrCodeUrl: '/images/payment_qr.jpg',
+        upiId: 'baaziboard@paytm',
+        upiHolderName: 'Baazi Board Official',
+        bankName: 'HDFC Bank',
+        accountNumber: '50100234567890',
+        ifscCode: 'HDFC0001234',
+        minDeposit: 100,
+        minWithdrawal: 200,
+      };
+    }
+  };
+
+  // Admin Portal Actions
+  const adminLoginPasscode = async (passcode: string): Promise<boolean> => {
+    try {
+      const res = await axios.post('/api/admin/login', { passcode });
+      if (res.data.success) {
+        localStorage.setItem('admin_passcode_token', res.data.token);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Invalid Admin Passcode');
+    }
+  };
+
+  const fetchAdminDeposits = async (status?: string, search?: string): Promise<DepositRequest[]> => {
+    try {
+      let url = '/api/admin/deposits?';
+      if (status) url += `status=${encodeURIComponent(status)}&`;
+      if (search) url += `search=${encodeURIComponent(search)}`;
+      const res = await axios.get(url);
+      if (res.data.success) {
+        return res.data.requests;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const adminApproveDeposit = async (requestId: string, adminNote?: string) => {
+    try {
+      const res = await axios.post('/api/admin/deposits/approve', { requestId, adminNote });
+      // If the currently logged in user is the beneficiary, update their balance live
+      if (res.data.success && user && res.data.depositRequest?.userId === user.id) {
+        const updated = { ...user, walletBalance: res.data.updatedUserBalance };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to approve request');
+    }
+  };
+
+  const adminRejectDeposit = async (requestId: string, reason?: string) => {
+    try {
+      const res = await axios.post('/api/admin/deposits/reject', { requestId, reason });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to reject request');
+    }
+  };
+
+  const updateAdminConfig = async (configData: Partial<AdminSettings>): Promise<AdminSettings> => {
+    try {
+      const res = await axios.post('/api/admin/config', configData);
+      if (res.data.success) {
+        return res.data.settings;
+      }
+      throw new Error('Failed to update config');
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to update admin config');
+    }
+  };
+
+  const fetchAdminStats = async () => {
+    try {
+      const res = await axios.get('/api/admin/stats');
+      if (res.data.success) {
+        return res.data.stats;
+      }
+      return null;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const fetchAdminUsers = async (): Promise<User[]> => {
+    try {
+      const res = await axios.get('/api/admin/users');
+      if (res.data.success) {
+        return res.data.users;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const adminAdjustUserBalance = async (userId: string, type: 'REAL' | 'DEMO', delta: number) => {
+    try {
+      const res = await axios.post('/api/admin/users/adjust-balance', { userId, type, delta });
+      if (res.data.success && user && res.data.user?.id === user.id) {
+        const updated = {
+          ...user,
+          walletBalance: res.data.user.walletBalance,
+          demoBalance: res.data.user.demoBalance,
+        };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to adjust user balance');
+    }
+  };
+
+  const adminCreateTestDeposit = async (amount: number, email?: string) => {
+    try {
+      const res = await axios.post('/api/admin/deposits/create-test', { amount, email });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to create test deposit');
+    }
+  };
+
+  const adminResetAllWallets = async () => {
+    try {
+      const res = await axios.post('/api/admin/users/reset-all-wallets');
+      if (user) {
+        setUser({ ...user, walletBalance: 0 });
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to reset user wallets');
+    }
+  };
+
+  const fetchAdminGameLogs = async () => {
+    try {
+      const res = await axios.get('/api/admin/game-logs');
+      if (res.data.success) {
+        return res.data;
+      }
+      return { totalAdminCommission: 0, logs: [] };
+    } catch (err) {
+      return { totalAdminCommission: 0, logs: [] };
+    }
   };
 
   return (
@@ -318,6 +572,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         isAuthModalOpen,
         welcomeToast,
+        playMode,
+        setPlayMode,
         openAuthModal,
         closeAuthModal,
         sendOTP,
@@ -326,12 +582,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         updateWalletBalance,
+        updateDemoBalance,
         updateName,
         requestEmailChange,
         verifyEmailChange,
         recordGameMatch,
         fetchMatchHistory,
         openRazorpayCheckout,
+        submitDepositUTR,
+        submitWithdrawal,
+        fetchMyDeposits,
+        fetchPublicPaymentConfig,
+        adminLoginPasscode,
+        fetchAdminDeposits,
+        adminApproveDeposit,
+        adminRejectDeposit,
+        updateAdminConfig,
+        fetchAdminStats,
+        fetchAdminUsers,
+        adminAdjustUserBalance,
+        adminCreateTestDeposit,
+        adminResetAllWallets,
+        fetchAdminGameLogs,
       }}
     >
       {children}

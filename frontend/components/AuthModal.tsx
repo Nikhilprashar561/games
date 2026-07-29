@@ -53,9 +53,10 @@ export const AuthModal: React.FC = () => {
       await sendOTP(cleanEmail);
       setStep('otp');
       setResendTimer(30);
-      setSuccessMsg(`4-Digit OTP sent to ${cleanEmail}. Check your inbox!`);
+      setOtpDigits(['1', '2', '3', '4']);
+      setSuccessMsg(`⚡ Preview Mode Active: OTP is 1234 (Auto-filled below!)`);
       setTimeout(() => {
-        digitInputRefs[0].current?.focus();
+        digitInputRefs[3].current?.focus();
       }, 100);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send verification OTP. Please check your internet connection.');

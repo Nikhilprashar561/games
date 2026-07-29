@@ -77,7 +77,7 @@ export const HeroSection: React.FC = () => {
               </div>
 
               {/* Feature Badges */}
-              <div className="pt-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-xs font-bold text-slate-400">
+              <div className="pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold text-slate-400">
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
                   <span>Instant Game Rooms</span>

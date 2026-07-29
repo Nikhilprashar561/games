@@ -6,9 +6,15 @@ import { ArrowLeft, RotateCcw, User, Trophy, Sparkles, Clock } from 'lucide-reac
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 
+import { useAuth } from '../../../context/AuthContext';
+
 type BoardState = Array<string | null>;
 
 export default function TicTacToePage() {
+  const { user, recordGameMatch, openAuthModal } = useAuth();
+  const ENTRY_COST = 10;
+  const WIN_REWARD = 17.6;
+
   const [board, setBoard] = useState<BoardState>(Array(9).fill(null));
   const [isXNext, setIsXNext] = useState<boolean>(true);
   const [opponentName, setOpponentName] = useState<string>('Rohan_Gamer');
@@ -98,14 +104,21 @@ export default function TicTacToePage() {
       const winCheck = calculateWinner(newBoard);
       if (winCheck?.winner === 'O') {
         setScores((prev) => ({ ...prev, o: prev.o + 1 }));
+        recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'LOSS', ENTRY_COST, 0, opponentName);
       } else if (winCheck?.winner === 'Draw') {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
+        recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
     }, 1500); // 1.5s Realistic Human Strategic Thinking Latency
   };
 
   const handleClick = (index: number) => {
     if (board[index] || result || isOpponentThinking || !isXNext) return;
+
+    if (!user) {
+      openAuthModal();
+      return;
+    }
 
     const newBoard = [...board];
     newBoard[index] = 'X';
@@ -116,11 +129,14 @@ export default function TicTacToePage() {
     if (winCheck?.winner) {
       if (winCheck.winner === 'X') {
         setScores((prev) => ({ ...prev, x: prev.x + 1 }));
+        recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
         confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
       } else if (winCheck.winner === 'O') {
         setScores((prev) => ({ ...prev, o: prev.o + 1 }));
+        recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'LOSS', ENTRY_COST, 0, opponentName);
       } else {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
+        recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
     } else {
       setIsXNext(false);

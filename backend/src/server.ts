@@ -7,6 +7,7 @@ import { connectDB } from './config/db';
 import authRoutes from './routes/authRoutes';
 import gameRoutes from './routes/gameRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { setupSocket } from './socket/socketHandler';
 
 dotenv.config();
@@ -21,7 +22,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
-// Express Global Seamless CORS Middleware
+// Express Global Seamless CORS & Security Middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production')) {
@@ -30,8 +31,9 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
   }
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src * 'unsafe-inline';");
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -39,12 +41,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root Endpoint (Fixes GET / 404)
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    name: 'Baazi Board Backend API Server',
+    version: '1.0.0',
+    health: '/api/health',
+  });
+});
+
+// Favicon handler
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
+// Chrome DevTools & Browser .well-known probes handler
+app.all('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.status(200).json({});
+});
+
+app.all('/.well-known/*', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.status(200).json({});
+});
+
 app.use(cors({
   origin: true,
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Socket.io Setup with Full Cross-Origin Support
 const io = new Server(server, {
@@ -66,6 +97,7 @@ connectDB();
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({
