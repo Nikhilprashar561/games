@@ -16,7 +16,7 @@ interface AuthContextType {
   setPlayMode: (mode: PlayMode) => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
-  sendOTP: (email: string) => Promise<boolean>;
+  sendOTP: (email: string) => Promise<{ isExistingUser: boolean }>;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   login: (email: string) => Promise<void>;
   signup: (name: string, email: string) => Promise<void>;
@@ -133,13 +133,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
-  // Send 4-Digit OTP to Email
-  const sendOTP = async (email: string): Promise<boolean> => {
+  // Send 4-Digit OTP to Email (Direct Login for existing registered users)
+  const sendOTP = async (email: string): Promise<{ isExistingUser: boolean }> => {
     try {
       const res = await axios.post('/api/auth/send-otp', { email });
-      return res.data.success;
+
+      // EXISTING REGISTERED USER -> DIRECT LOGIN IMMEDIATELY ACCEPTED
+      if (res.data.isExistingUser) {
+        const newToken = res.data.token;
+        const newUser = res.data.user;
+
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user_session', JSON.stringify(newUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+
+        setToken(newToken);
+        setUser(newUser);
+        closeAuthModal();
+
+        setWelcomeToast(`Welcome back, ${newUser.name}! Direct login successful. 🎉`);
+        setTimeout(() => setWelcomeToast(null), 3000);
+
+        return { isExistingUser: true };
+      }
+
+      // FIRST TIME USER -> OTP SENT TO EMAIL
+      return { isExistingUser: false };
     } catch (err: any) {
-      throw new Error(err.response?.data?.message || 'Failed to send OTP to email');
+      throw new Error(err.response?.data?.message || 'Failed to process email login');
     }
   };
 
