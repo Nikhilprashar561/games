@@ -74,12 +74,12 @@ const COLOR_THEME: Record<PlayerColor, { base: string; tile: string; text: strin
   blue: { base: 'bg-blue-600', tile: 'bg-blue-600', text: 'text-white', grad: ['#93c5fd', '#1e40af'], ring: '#bfdbfe' },
 };
 
-// Color mapping for Teardrop Location Pin Markers
-const PIN_COLOR_HEX: Record<PlayerColor, { main: string; border: string }> = {
-  red: { main: '#e11d48', border: '#ffe4e6' },
-  green: { main: '#16a34a', border: '#dcfce7' },
-  yellow: { main: '#eab308', border: '#fef9c3' },
-  blue: { main: '#2563eb', border: '#dbeafe' },
+// Color mapping for glossy gem-style token markers
+const PIN_COLOR_HEX: Record<PlayerColor, { main: string; light: string; dark: string; border: string }> = {
+  red: { main: '#e11d48', light: '#fda4af', dark: '#9f1239', border: '#ffffff' },
+  green: { main: '#16a34a', light: '#86efac', dark: '#14532d', border: '#ffffff' },
+  yellow: { main: '#eab308', light: '#fde68a', dark: '#92400e', border: '#ffffff' },
+  blue: { main: '#2563eb', light: '#93c5fd', dark: '#1e3a8a', border: '#ffffff' },
 };
 
 const FACE_ROTATIONS: Record<number, { x: number; y: number }> = {
@@ -598,46 +598,51 @@ export default function LudoPage() {
     );
   };
 
-// ---------- TEARDROP LOCATION PIN MARKER (Dead-Center Aligned) ----------
+// ---------- GLOSSY GEM-STYLE TOKEN MARKER (perfectly centered, sits flush on the board) ----------
 const renderPawn = (
   color: PlayerColor,
   isSelectable: boolean = false,
   isTraveling: boolean = false,
   scaleFactor: 'normal' | 'medium' | 'small' = 'normal'
 ) => {
-  const { main, border } = PIN_COLOR_HEX[color];
+  const { main, light, dark, border } = PIN_COLOR_HEX[color];
+  const gradId = `pawnGrad-${color}`;
 
-  // Fixed size classes to prevent height/width distortion or layout shifts
+  // Square, symmetric footprint so the visual weight always sits dead-center in its cell —
+  // no pointed "pin" tip that reads as floating above the board.
   const sizeClasses =
     scaleFactor === 'small'
-      ? 'w-3.5 h-4.5 sm:w-4 sm:h-5'
+      ? 'w-[16px] h-[16px] sm:w-[19px] sm:h-[19px]'
       : scaleFactor === 'medium'
-      ? 'w-4.5 h-5.5 sm:w-5 sm:h-6'
-      : 'w-6 h-7 sm:w-7 sm:h-8';
+      ? 'w-[20px] h-[20px] sm:w-[23px] sm:h-[23px]'
+      : 'w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]';
 
   return (
     <div
-      className={`relative flex items-center justify-center cursor-pointer transition-opacity duration-150 ${sizeClasses}`}
+      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 ${sizeClasses} ${
+        isTraveling ? 'scale-110' : ''
+      }`}
     >
       {isSelectable && (
-        <div className="absolute -inset-1 rounded-full bg-emerald-400/60 blur-[3px] animate-pulse pointer-events-none" />
+        <div className="absolute -inset-1.5 rounded-full bg-emerald-400/50 blur-[4px] animate-pulse pointer-events-none" />
       )}
 
-      {/* Exact Teardrop Location Pin SVG with Center Alignment */}
-      <svg
-        viewBox="0 0 24 30"
-        className="w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M12 0C5.37 0 0 5.37 0 12C0 19.5 12 30 12 30C12 30 24 19.5 24 12C24 5.37 18.63 0 12 0Z"
-          fill={main}
-          stroke={border}
-          strokeWidth="1.2"
-        />
-        {/* Hollow White Center Circle Head */}
-        <circle cx="12" cy="11" r="5" fill="#ffffff" />
+      {/* Grounded contact shadow so the piece reads as resting ON the cell, not above it */}
+      <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 w-[70%] h-[18%] rounded-full bg-black/35 blur-[1.5px] pointer-events-none" />
+
+      <svg viewBox="0 0 32 32" className="relative w-full h-full drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.35)]">
+        <defs>
+          <radialGradient id={gradId} cx="38%" cy="32%" r="75%">
+            <stop offset="0%" stopColor={light} />
+            <stop offset="55%" stopColor={main} />
+            <stop offset="100%" stopColor={dark} />
+          </radialGradient>
+        </defs>
+        {/* Outer white collar keeps the piece legible against any tile color */}
+        <circle cx="16" cy="16" r="14.5" fill={border} />
+        <circle cx="16" cy="16" r="12" fill={`url(#${gradId})`} stroke={dark} strokeWidth="0.75" />
+        {/* Glossy highlight */}
+        <ellipse cx="12" cy="10.5" rx="4.4" ry="3" fill="#ffffff" opacity="0.55" />
       </svg>
     </div>
   );
@@ -648,17 +653,36 @@ const renderPawn = (
     const isCurrentTurn = currentTurn === color;
     const isUserColor = color === userColor;
     const canUnlock = hasRolled && diceVal === 6 && isCurrentTurn && isUserColor;
+    const theme = COLOR_THEME[color];
 
     return (
       <div
-        className={`${gridClass} ${COLOR_THEME[color].base} p-2.5 sm:p-4 flex flex-col items-center justify-center transition-all ${
-          isCurrentTurn
-            ? 'shadow-[0_0_30px_rgba(255,255,255,0.8)] scale-[1.03] z-10 border-2 border-white'
-            : 'border-2 border-slate-900/40 opacity-95'
+        className={`${gridClass} ${theme.base} relative p-2.5 sm:p-4 flex flex-col items-center justify-center transition-shadow duration-300 border-2 border-slate-900/30 ${
+          isCurrentTurn ? 'z-10 turn-glow-' + color : 'opacity-95'
         }`}
       >
+        {/* Turn indicator: animated glow ring + sheen, never resizes the element so nothing shifts */}
+        {isCurrentTurn && (
+          <>
+            <div className={`pointer-events-none absolute -inset-[3px] rounded-[4px] turn-ring-${color}`} />
+            <div className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/95 shadow-md turn-badge-pop">
+              <span className={`w-1.5 h-1.5 rounded-full ${theme.base} animate-pulse`} />
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wide text-slate-800">Turn</span>
+            </div>
+          </>
+        )}
+
+        {/* Subtle decorative pattern for a more "designed" surface */}
+        <div
+          className="absolute inset-0 opacity-[0.08] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+            backgroundSize: '10px 10px',
+          }}
+        />
+
         {/* Inner White Sockets Courtyard */}
-        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3 shadow-[inset_0_3px_8px_rgba(0,0,0,0.18)] border-2 border-slate-300/80 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3 items-center justify-items-center relative">
+        <div className="w-full h-full bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl sm:rounded-3xl p-2 sm:p-3.5 shadow-[inset_0_3px_10px_rgba(0,0,0,0.16)] border-2 border-white/70 ring-1 ring-slate-300/60 grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3.5 items-center justify-items-center relative">
           {tokens[color].map((t) => {
             const inBase = t.position === -1;
             const isSelectable = canUnlock && inBase;
@@ -671,17 +695,18 @@ const renderPawn = (
                     handlePlayerTokenClick(t.id);
                   }
                 }}
-                className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all ${
+                className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative transition-all duration-200 ${
                   isSelectable
                     ? 'ring-4 ring-emerald-400 bg-emerald-50 scale-105 cursor-pointer shadow-lg animate-pulse'
-                    : 'bg-slate-200/90 shadow-[inset_0_3px_6px_rgba(0,0,0,0.2)] border border-slate-300'
+                    : 'bg-white shadow-[inset_0_2px_5px_rgba(0,0,0,0.16),0_1px_0_rgba(255,255,255,0.8)] border'
                 }`}
+                style={!isSelectable ? { borderColor: `${PIN_COLOR_HEX[color].main}33` } : undefined}
               >
                 {inBase ? (
                   renderPawn(color, isSelectable, false, 'normal')
                 ) : (
                   <div
-                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-40 shadow-inner"
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-30 shadow-inner"
                     style={{ backgroundColor: PIN_COLOR_HEX[color].main }}
                   />
                 )}
@@ -721,7 +746,7 @@ const renderPawn = (
         {count > 0 && (
           <div
             className={`absolute inset-0 flex items-center justify-center z-20 pointer-events-none ${
-              count > 1 ? 'grid grid-cols-2 grid-rows-2 p-0.5 gap-0.5' : ''
+              count > 1 ? 'grid grid-cols-2 grid-rows-2 place-items-center p-[1px] gap-0' : ''
             }`}
           >
             {presentTokens.map((t, i) => {
@@ -768,6 +793,22 @@ const renderPawn = (
           50% { transform: perspective(700px) rotateX(14deg) rotateY(-6deg); }
         }
         .animate-dice-idle { animation: diceIdle 3.2s ease-in-out infinite; }
+
+        /* ---------- Turn indicator: pure glow/opacity pulse, zero layout impact ---------- */
+        @keyframes turnRingPulse {
+          0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 18px 4px var(--turn-glow-color), 0 0 0 6px var(--turn-glow-color-soft); opacity: 1; }
+          50% { box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 30px 8px var(--turn-glow-color), 0 0 0 9px var(--turn-glow-color-soft); opacity: 0.85; }
+        }
+        .turn-ring-red { --turn-glow-color: rgba(225,29,72,0.65); --turn-glow-color-soft: rgba(225,29,72,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-green { --turn-glow-color: rgba(22,163,74,0.65); --turn-glow-color-soft: rgba(22,163,74,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-yellow { --turn-glow-color: rgba(234,179,8,0.65); --turn-glow-color-soft: rgba(234,179,8,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+        .turn-ring-blue { --turn-glow-color: rgba(37,99,235,0.65); --turn-glow-color-soft: rgba(37,99,235,0.18); animation: turnRingPulse 1.6s ease-in-out infinite; border-radius: inherit; }
+
+        @keyframes turnBadgePop {
+          0% { transform: translate(-50%, -4px); opacity: 0; }
+          100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .turn-badge-pop { animation: turnBadgePop 0.25s ease-out; }
       `}</style>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -923,6 +964,7 @@ const renderPawn = (
                       const isGreenHomeStr = col === 8 && row >= 2 && row <= 6;
                       const isYellowHomeStr = row === 8 && col >= 10 && col <= 14;
                       const isBlueHomeStr = col === 8 && row >= 10 && row <= 14;
+                      const isHomeStretch = isRedHomeStr || isGreenHomeStr || isYellowHomeStr || isBlueHomeStr;
 
                       const isRedStart = row === 7 && col === 2;
                       const isGreenStart = row === 2 && col === 9;
@@ -940,19 +982,32 @@ const renderPawn = (
                       return (
                         <div
                           key={`cell-${row}-${col}`}
-                          className={`relative border border-slate-300 dark:border-slate-300 flex items-center justify-center font-bold text-[9px] ${
+                          className={`relative flex items-center justify-center font-bold text-[9px] ${
                             isRedHomeStr || isRedStart
-                              ? `${COLOR_THEME.red.tile} text-white shadow-sm`
+                              ? `${COLOR_THEME.red.tile} text-white`
                               : isGreenHomeStr || isGreenStart
-                              ? `${COLOR_THEME.green.tile} text-white shadow-sm`
+                              ? `${COLOR_THEME.green.tile} text-white`
                               : isYellowHomeStr || isYellowStart
-                              ? `${COLOR_THEME.yellow.tile} text-slate-950 shadow-sm`
+                              ? `${COLOR_THEME.yellow.tile} text-slate-950`
                               : isBlueHomeStr || isBlueStart
-                              ? `${COLOR_THEME.blue.tile} text-white shadow-sm`
-                              : 'bg-white text-slate-700 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]'
+                              ? `${COLOR_THEME.blue.tile} text-white`
+                              : 'bg-white text-slate-700'
                           }`}
-                          style={{ gridRowStart: row, gridColumnStart: col }}
+                          style={{
+                            gridRowStart: row,
+                            gridColumnStart: col,
+                            boxShadow: isHomeStretch
+                              ? 'inset 0 0 0 2px rgba(255,255,255,0.65)'
+                              : 'inset 0 0 0 0.5px rgba(100,116,139,0.28)',
+                          }}
                         >
+                          {isHomeStretch && (
+                            <div
+                              className={`pointer-events-none absolute bg-white/40 ${
+                                isRedHomeStr || isYellowHomeStr ? 'top-[15%] bottom-[15%] left-1/2 -translate-x-1/2 w-[3px]' : 'left-[15%] right-[15%] top-1/2 -translate-y-1/2 h-[3px]'
+                              } rounded-full`}
+                            />
+                          )}
                           {isStarCell && <Star className="w-3 h-3 text-amber-400 fill-current" />}
                           {arrow && (
                             <arrow.Icon

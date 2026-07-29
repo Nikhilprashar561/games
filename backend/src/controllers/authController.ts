@@ -35,11 +35,32 @@ export const sendOTP = async (req: Request, res: Response) => {
     const cleanEmail = email.toLowerCase().trim();
     const displayName = cleanEmail.split('@')[0];
     const otp = generate4DigitOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     try {
       let user = await User.findOne({ email: cleanEmail });
 
+      // EXISTING USER -> DIRECT LOGIN ACCEPTED WITHOUT OTP!
+      if (user && user.isVerified) {
+        const token = generateToken(user._id.toString(), user.email);
+        return res.json({
+          success: true,
+          isExistingUser: true,
+          token,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            walletBalance: user.walletBalance,
+            upiId: user.upiId,
+            avatar: user.avatar,
+            isVerified: true,
+          },
+          message: `Welcome back, ${user.name}! Direct login successful.`,
+        });
+      }
+
+      // FIRST TIME USER -> CREATE ACCOUNT & SEND OTP
       if (!user) {
         user = await User.create({
           name: displayName,
@@ -60,10 +81,33 @@ export const sendOTP = async (req: Request, res: Response) => {
       await sendOTPEmail(cleanEmail, otp, user.name);
       return res.json({
         success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
+        isExistingUser: false,
+        message: `First-time registration: 4-Digit OTP sent to ${cleanEmail}. Please check your inbox!`,
       });
     } catch (dbErr) {
       let mockUser = fallbackUsers.get(cleanEmail);
+
+      // EXISTING FALLBACK USER -> DIRECT LOGIN
+      if (mockUser && mockUser.isVerified) {
+        const token = generateToken(mockUser.id, mockUser.email);
+        return res.json({
+          success: true,
+          isExistingUser: true,
+          token,
+          user: {
+            id: mockUser.id,
+            name: mockUser.name,
+            email: mockUser.email,
+            walletBalance: mockUser.walletBalance,
+            upiId: mockUser.upiId,
+            avatar: mockUser.avatar,
+            isVerified: true,
+          },
+          message: `Welcome back, ${mockUser.name}! Direct login successful.`,
+        });
+      }
+
+      // FIRST TIME FALLBACK USER -> SEND OTP
       if (!mockUser) {
         mockUser = {
           id: 'user_' + Date.now(),
@@ -85,12 +129,13 @@ export const sendOTP = async (req: Request, res: Response) => {
       await sendOTPEmail(cleanEmail, otp, mockUser.name);
       return res.json({
         success: true,
-        message: `4-Digit OTP sent to ${cleanEmail}. Please check your inbox or spam folder!`,
+        isExistingUser: false,
+        message: `First-time registration: 4-Digit OTP sent to ${cleanEmail}. Please check your inbox!`,
       });
     }
   } catch (error: any) {
     console.error('Send OTP Error:', error);
-    return res.status(500).json({ message: error.message || 'Failed to send verification OTP' });
+    return res.status(500).json({ message: error.message || 'Failed to process login / OTP request' });
   }
 };
 

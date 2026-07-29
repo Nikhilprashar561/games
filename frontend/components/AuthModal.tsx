@@ -50,15 +50,25 @@ export const AuthModal: React.FC = () => {
     setErrorMsg(null);
     setSubmitting(true);
     try {
-      await sendOTP(cleanEmail);
+      const res = await sendOTP(cleanEmail);
+
+      // If existing user, direct login happened in AuthContext! Clear form.
+      if (res && res.isExistingUser) {
+        setEmail('');
+        setOtpDigits(['', '', '', '']);
+        setStep('email');
+        return;
+      }
+
+      // First time user -> Proceed to OTP verification step!
       setStep('otp');
       setResendTimer(30);
-      setSuccessMsg(`4-Digit OTP sent to ${cleanEmail}. Check your inbox!`);
+      setSuccessMsg(`First-time registration: 4-Digit OTP sent to ${cleanEmail}. Check your inbox!`);
       setTimeout(() => {
         digitInputRefs[0].current?.focus();
       }, 100);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to send verification OTP. Please check your internet connection.');
+      setErrorMsg(err.message || 'Failed to process email login. Please check your internet connection.');
     } finally {
       setSubmitting(false);
     }
@@ -199,8 +209,8 @@ export const AuthModal: React.FC = () => {
                   className="w-full pl-10 pr-4 py-3.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm font-semibold"
                 />
               </div>
-              <p className="text-[11px] text-amber-400 mt-2 font-semibold leading-normal">
-                💡 Note: Please enter your real active email address because a 4-digit verification OTP code will be sent to your inbox in the next step!
+              <p className="text-[11px] text-emerald-400 mt-2 font-semibold leading-normal">
+                💡 Note: Registered users log in instantly with no OTP! First-time users will receive a 4-digit verification OTP email.
               </p>
             </div>
 

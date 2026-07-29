@@ -38,16 +38,16 @@ const LEFT_BASELINE_X = PLAY_MIN + 58;
 const RIGHT_BASELINE_X = PLAY_MAX - 58;
 
 /* ============================================================================
- * PHYSICS TUNING
+ * PHYSICS TUNING — Medium-Fast Responsive Puck Speed & Clean Settling
  * ==========================================================================*/
-const FRICTION = 0.983;
-const MIN_SPEED = 0.06;
-const WALL_RESTITUTION = 0.74;
-const COIN_RESTITUTION = 0.92;
-const MAX_SHOT_SPEED = 24;
-const MIN_SHOT_SPEED = 3;
-const MAX_DRAG_PX = 120;
-const MAX_SIM_FRAMES = 420; // safety cap (~7s @ 60fps) so a physics edge-case can never hang the game
+const FRICTION = 0.968;
+const MIN_SPEED = 0.12;
+const WALL_RESTITUTION = 0.78;
+const COIN_RESTITUTION = 0.94;
+const MAX_SHOT_SPEED = 34;
+const MIN_SHOT_SPEED = 6;
+const MAX_DRAG_PX = 130;
+const MAX_SIM_FRAMES = 300; // Fast & crisp resolution
 
 /* ============================================================================
  * GAME RULES CONSTANTS
@@ -543,47 +543,55 @@ export default function CarromPage() {
     const striker = g.pieces.find((p) => p.kind === 'striker');
     if (!striker) return;
 
-    const targets = g.pieces.filter((p) => p.kind === 'black' && !p.potted);
-    const fallback = g.pieces.filter((p) => p.kind === 'queen' && !p.potted);
-    const pool = targets.length > 0 ? targets : fallback;
+    const queen = g.pieces.find((p) => p.kind === 'queen' && !p.potted);
+    const blackCoins = g.pieces.filter((p) => p.kind === 'black' && !p.potted);
+    const pool = queen ? [queen, ...blackCoins] : blackCoins;
 
     if (pool.length === 0) {
-      // Nothing left to aim at — tap the queen's old center spot gently.
       striker.x = CENTER;
       striker.y = BASELINE_AI_Y;
-      shoot({ x: 0, y: 1 }, 0, 40);
+      shoot({ x: 0, y: 1 }, 0, 50);
       return;
     }
 
-    // Pick the coin/pocket pair with the shortest coin->pocket distance —
-    // easiest shot available, like a beginner-level heuristic player.
+    // Smart Trajectory Evaluator: Pick target coin & pocket with cleanest shot line
     let bestCoin = pool[0];
     let bestPocket = POCKETS[0];
-    let bestDist = Infinity;
+    let bestScore = -Infinity;
+
     for (const coin of pool) {
       for (const pocket of POCKETS) {
-        const d = dist(coin, pocket);
-        if (d < bestDist) {
-          bestDist = d;
+        const dPocket = dist(coin, pocket);
+        const toPocket = { x: pocket.x - coin.x, y: pocket.y - coin.y };
+        const len = Math.hypot(toPocket.x, toPocket.y) || 1;
+        const dirToPocket = { x: toPocket.x / len, y: toPocket.y / len };
+
+        const contact = {
+          x: coin.x - dirToPocket.x * (coin.r + STRIKER_R),
+          y: coin.y - dirToPocket.y * (coin.r + STRIKER_R),
+        };
+
+        const aimVec = { x: contact.x - CENTER, y: contact.y - BASELINE_AI_Y };
+        const dot = (aimVec.x * dirToPocket.x + aimVec.y * dirToPocket.y) / (Math.hypot(aimVec.x, aimVec.y) || 1);
+
+        const score = dot * 200 - dPocket + (coin.kind === 'queen' ? 50 : 0);
+        if (score > bestScore) {
+          bestScore = score;
           bestCoin = coin;
           bestPocket = pocket;
         }
       }
     }
 
-    // Direction the coin needs to travel: from pocket toward coin, continued.
     const toPocket = { x: bestPocket.x - bestCoin.x, y: bestPocket.y - bestCoin.y };
     const len = Math.hypot(toPocket.x, toPocket.y) || 1;
     const dirToPocket = { x: toPocket.x / len, y: toPocket.y / len };
 
-    // Contact point on the far side of the coin (away from the pocket).
     const contact = {
       x: bestCoin.x - dirToPocket.x * (bestCoin.r + STRIKER_R),
       y: bestCoin.y - dirToPocket.y * (bestCoin.r + STRIKER_R),
     };
 
-    // Project backward from the contact point to the AI baseline to choose
-    // a striker start x-position roughly in line with the shot.
     const forward: Vec2 = { x: 0, y: 1 };
     let startX = contact.x;
     if (Math.abs(dirToPocket.y) > 0.001) {
@@ -595,13 +603,12 @@ export default function CarromPage() {
     striker.x = startX;
     striker.y = BASELINE_AI_Y;
 
-    // Slight human-like inaccuracy so the AI doesn't play perfectly.
-    const noise = (Math.random() - 0.5) * 9;
+    const noise = (Math.random() - 0.5) * 3; // Natural subtle variation
     const aimVec = { x: contact.x - startX, y: contact.y - BASELINE_AI_Y };
     const aimAngle = vecToAngle(forward, aimVec) + noise;
 
     const shotDistance = dist(striker, bestCoin) + dist(bestCoin, bestPocket);
-    const aiPower = clamp(45 + shotDistance / 6, 45, 96);
+    const aiPower = clamp(55 + shotDistance / 5, 50, 98);
 
     shoot(forward, aimAngle, aiPower);
     // eslint-disable-next-line react-hooks/exhaustive-deps
