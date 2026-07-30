@@ -41,15 +41,10 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
 
         {/* Protection / Mode Badge */}
         <div className="absolute top-2.5 left-2.5 flex items-center space-x-1 text-[11px] font-bold shadow-md backdrop-blur-md">
-          {!game.isProtected ? (
-            <span className="bg-emerald-500 text-white px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-              <Sparkles className="w-3 h-3" />
-              <span>FREE PLAY</span>
-            </span>
-          ) : playMode === 'DEMO' ? (
+          {!game.isProtected || game.slug === 'tic-tac-toe' ? (
             <span className="bg-amber-600/90 text-white border border-amber-400/40 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
               <Coins className="w-3 h-3 text-amber-300" />
-              <span>DEMO MODE</span>
+              <span>DEMO COINS</span>
             </span>
           ) : (
             <span className="bg-emerald-600/90 text-white border border-emerald-400/40 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
@@ -84,11 +79,15 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
             <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
               {game.category}
             </span>
-            {game.entryFee ? (
+            {game.slug === 'tic-tac-toe' ? (
               <span className="text-xs font-bold text-amber-400">
-                {playMode === 'REAL' ? `Fee: ₹${game.entryFee}` : `Demo Fee: 🪙${game.entryFee}`}
+                Fee: 🪙 10 Demo
               </span>
-            ) : null}
+            ) : (
+              <span className="text-xs font-bold text-emerald-400">
+                Entry: ₹{game.entryFee}
+              </span>
+            )}
           </div>
           <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors font-['Space_Grotesk']">
             {game.title}
@@ -100,7 +99,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
 
         <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold">
           <span className="text-slate-400 text-[11px]">
-            {game.isProtected && !user ? 'Login Required' : `Play in ${playMode === 'REAL' ? 'Real Cash' : 'Demo Mode'}`}
+            {game.isProtected && !user ? 'Login Required' : game.slug === 'tic-tac-toe' ? 'Play in Demo Mode (Free)' : 'Play for Real Cash 💰'}
           </span>
           <span className="text-emerald-400 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center text-xs">
             Launch &rarr;

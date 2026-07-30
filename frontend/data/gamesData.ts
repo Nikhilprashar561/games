@@ -10,9 +10,9 @@ export const gamesData: GameInfo[] = [
     isProtected: false,
     category: 'Free Play',
     playersCount: '2,450 Playing Now',
-    badge: 'PUBLIC',
-    entryFee: 0,
-    winReward: 0,
+    badge: 'DEMO COINS',
+    entryFee: 10,
+    winReward: 17.6,
   },
   {
     id: '2',
