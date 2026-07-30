@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RotateCcw, User, Trophy, Sparkles, Clock, Coins, Play, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, RotateCcw, User, Trophy, Sparkles, Clock, Coins, Play, ShieldAlert, CheckCircle2, LogOut } from 'lucide-react';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 import { useAuth } from '../../../context/AuthContext';
@@ -18,7 +19,17 @@ export default function TicTacToePage() {
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
 
-  // Enforce Demo Mode for Tic-Tac-Toe
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (gameState === 'PLAYING') {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
   useEffect(() => {
     setPlayMode('DEMO');
   }, []);
@@ -201,10 +212,7 @@ export default function TicTacToePage() {
       {/* Single-Tab Back Navigation */}
       <Link
         href="/#games-section"
-        onClick={(e) => {
-          e.preventDefault();
-          router.push('/#games-section');
-        }}
+        onClick={handleBackToGames}
         className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-400 hover:text-emerald-400 transition-colors mb-6 cursor-pointer"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -353,18 +361,62 @@ export default function TicTacToePage() {
               )}
             </div>
 
-            {/* Play Again Button */}
-            <div className="flex justify-center">
+            {/* Play Again & Leave Game Controls */}
+            <div className="flex flex-col items-center space-y-2.5">
               <button
-                onClick={startMatch}
-                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center space-x-2 shadow-lg shadow-amber-500/20"
+                onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
+                className="w-full max-w-xs py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Play Again (Deduct 10 Coins) 🎮</span>
               </button>
+
+              <button
+                onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                className="w-full max-w-xs py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Leave Game</span>
+              </button>
             </div>
           </>
         )}
+
+        <GameConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Start Next Match?'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'Exit Active Game?'
+              : 'Exit to All Games?'
+          }
+          message={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Are you sure you want to start the next match?'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+              : 'Are you sure you want to exit to All Games?'
+          }
+          confirmText={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Yes, Start Match'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'Yes, Leave Game'
+              : 'Yes, Exit'
+          }
+          cancelText="No, Keep Playing"
+          variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+          onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={() => {
+            setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+            if (confirmModal.type === 'NEXT_MATCH') {
+              startMatch();
+            } else {
+              router.push('/#games-section');
+            }
+          }}
+        />
 
       </div>
     </div>

@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, ShieldCheck, Trophy, Wallet, RotateCcw, Target, Clock, Crown, AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ShieldCheck, Trophy, Wallet, RotateCcw, Target, Clock, Crown, AlertTriangle, LogOut } from 'lucide-react';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
@@ -213,17 +215,31 @@ export default function CarromPage() {
     queenState: 'on_board' as 'on_board' | 'pending_player' | 'pending_ai' | 'covered_player' | 'covered_ai',
   });
 
+  const router = useRouter();
+  const [hasPaidEntry, setHasPaidEntry] = useState(false);
+  const [winner, setWinner] = useState<string | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (hasPaidEntry && !winner) {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
+
   const [entryCost, setEntryCost] = useState<number>(20);
   const winReward = Math.round(entryCost * 2 * 0.88 * 100) / 100;
 
-  const [hasPaidEntry, setHasPaidEntry] = useState(false);
   const [opponentName, setOpponentName] = useState('Rahul_Carrom');
   const [turn, setTurn] = useState<Turn>('player');
   const [playerScore, setPlayerScore] = useState(0);
   const [aiScore, setAiScore] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
-  const [winner, setWinner] = useState<string | null>(null);
   const [message, setMessage] = useState('Drag the striker back to aim, release to shoot.');
   const [angle, setAngle] = useState(0);
   const [power, setPower] = useState(70);
@@ -1109,7 +1125,8 @@ export default function CarromPage() {
     <ProtectedRoute>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
-          href="/"
+          href="/#games-section"
+          onClick={handleBackToGames}
           className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -1290,16 +1307,61 @@ export default function CarromPage() {
                   )}
 
                   <button
-                    onClick={handleStartMatch}
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
                     className="w-full py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>New Match (₹{entryCost} Stake)</span>
                   </button>
+
+                  <button
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                    className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Game</span>
+                  </button>
                 </div>
               </div>
             </div>
           )}
+
+          <GameConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Start Next Match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Exit Active Game?'
+                : 'Exit to All Games?'
+            }
+            message={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Are you sure you want to start the next match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+                : 'Are you sure you want to exit to All Games?'
+            }
+            confirmText={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Yes, Start Match'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Yes, Leave Game'
+                : 'Yes, Exit'
+            }
+            cancelText="No, Keep Playing"
+            variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+            onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+            onConfirm={() => {
+              setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+              if (confirmModal.type === 'NEXT_MATCH') {
+                handleStartMatch();
+              } else {
+                router.push('/#games-section');
+              }
+            }}
+          />
+
         </div>
       </div>
     </ProtectedRoute>

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { useRouter } from 'next/navigation';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import {
   ArrowLeft,
   Wallet,
@@ -21,6 +23,7 @@ import {
   TrendingUp,
   RotateCcw,
   Zap,
+  LogOut,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
@@ -587,7 +590,21 @@ function CardBack({ small }: { small?: boolean }) {
 
 export default function TeenPattiPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const router = useRouter();
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
   const [state, dispatch] = useReducer(reducer, LOBBY_STATE);
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (state.phase === 'playing' || state.phase === 'result') {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
   const stateRef = useRef(state);
   const settledRef = useRef<string | null>(null);
 
@@ -1153,13 +1170,21 @@ export default function TeenPattiPage() {
 
                 {state.phase === 'result' && (
                   <button
-                    onClick={startMatch}
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
                     className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base shadow-xl transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-5 h-5" />
                     <span>Play Next Round (₹{state.bootAmount} Boot)</span>
                   </button>
                 )}
+
+                <button
+                  onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Leave Game</span>
+                </button>
               </div>
 
               {/* Live Match Info Footer */}
@@ -1185,8 +1210,45 @@ export default function TeenPattiPage() {
                   <p className="text-xs font-black text-amber-500">₹{state.currentStake}</p>
                 </div>
               </div>
+
             </div>
           )}
+
+          <GameConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Start Next Match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Exit Active Game?'
+                : 'Exit to All Games?'
+            }
+            message={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Are you sure you want to start the next match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+                : 'Are you sure you want to exit to All Games?'
+            }
+            confirmText={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Yes, Start Match'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Yes, Leave Game'
+                : 'Yes, Exit'
+            }
+            cancelText="No, Keep Playing"
+            variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+            onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+            onConfirm={() => {
+              setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+              if (confirmModal.type === 'NEXT_MATCH') {
+                startMatch();
+              } else {
+                router.push('/#games-section');
+              }
+            }}
+          />
         </div>
       </div>
     </ProtectedRoute>

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { useRouter } from 'next/navigation';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import {
   ArrowLeft,
   Wallet,
@@ -18,6 +20,7 @@ import {
   TrendingUp,
   Target,
   Percent,
+  LogOut,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -58,6 +61,19 @@ function shuffle<T>(arr: T[]): T[] {
 
 export default function NumberPredictPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const router = useRouter();
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (hasEntered && flippedIndex === null) {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
 
   const [hasEntered, setHasEntered] = useState(false);
   const [tiles, setTiles] = useState<VaultTile[]>([]);
@@ -166,7 +182,8 @@ export default function NumberPredictPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
-          href="/"
+          href="/#games-section"
+          onClick={handleBackToGames}
           className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -357,11 +374,56 @@ export default function NumberPredictPage() {
                         ₹{netResult}
                       </span>
                     </div>
+
+                    <button
+                      onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                      className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Leave Game</span>
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          <GameConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Start Next Match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Exit Active Game?'
+                : 'Exit to All Games?'
+            }
+            message={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Are you sure you want to start the next match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+                : 'Are you sure you want to exit to All Games?'
+            }
+            confirmText={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Yes, Start Match'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Yes, Leave Game'
+                : 'Yes, Exit'
+            }
+            cancelText="No, Keep Playing"
+            variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+            onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+            onConfirm={() => {
+              setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+              if (confirmModal.type === 'NEXT_MATCH') {
+                handleEnter();
+              } else {
+                router.push('/#games-section');
+              }
+            }}
+          />
+
         </div>
 
         {/* Result modal */}

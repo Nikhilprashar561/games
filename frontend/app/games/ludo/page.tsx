@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
+import { useRouter } from 'next/navigation';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import {
   ArrowLeft,
   ArrowUp,
@@ -13,14 +15,20 @@ import {
   RotateCcw,
   Wallet,
   Clock,
-  Star,
-  Sparkles,
-  Crown,
+  Volume2,
+  VolumeX,
   Users,
+  Trophy,
+  Crown,
+  ShieldCheck,
   Zap,
-  Brain,
+  Sparkles,
+  AlertCircle,
+  HelpCircle,
+  Award,
+  LogOut,
+  Star,
   TrendingUp,
-  BarChart2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
@@ -183,10 +191,25 @@ const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (m
 
 export default function LudoPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const router = useRouter();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
 
   const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
+  const [winner, setWinner] = useState<string | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (hasPaidEntry && !winner) {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
+
   const [userColor, setUserColor] = useState<PlayerColor>('red');
   const [gameMode, setGameMode] = useState<GameMode>('1v1');
 
@@ -217,7 +240,6 @@ export default function LudoPage() {
       };
     });
   };
-  const [winner, setWinner] = useState<string | null>(null);
 
   const [travelingTokenId, setTravelingTokenId] = useState<{ color: PlayerColor; id: number } | null>(null);
   const [travelPath, setTravelPath] = useState<[number, number][]>([]);
@@ -815,7 +837,8 @@ const renderPawn = (
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
-          href="/"
+          href="/#games-section"
+          onClick={handleBackToGames}
           className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -1175,11 +1198,19 @@ const renderPawn = (
                   </div>
 
                   <button
-                    onClick={handleStartMatch}
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
                     className="w-full py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>New Match (₹25 Stake)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                    className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Game</span>
                   </button>
 
                 </div>
@@ -1187,6 +1218,42 @@ const renderPawn = (
 
             </div>
           )}
+
+          <GameConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Start Next Match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Exit Active Game?'
+                : 'Exit to All Games?'
+            }
+            message={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Are you sure you want to start the next match?'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+                : 'Are you sure you want to exit to All Games?'
+            }
+            confirmText={
+              confirmModal.type === 'NEXT_MATCH'
+                ? 'Yes, Start Match'
+                : confirmModal.type === 'LEAVE_GAME'
+                ? 'Yes, Leave Game'
+                : 'Yes, Exit'
+            }
+            cancelText="No, Keep Playing"
+            variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+            onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+            onConfirm={() => {
+              setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+              if (confirmModal.type === 'NEXT_MATCH') {
+                handleStartMatch();
+              } else {
+                router.push('/#games-section');
+              }
+            }}
+          />
 
         </div>
       </div>

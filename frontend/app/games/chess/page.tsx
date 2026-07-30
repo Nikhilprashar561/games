@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
-import { ArrowLeft, RotateCcw, Clock, ShieldCheck, Zap, Wallet, Trophy, User, Crown, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, RotateCcw, Clock, ShieldCheck, Zap, Wallet, Trophy, User, Crown, AlertTriangle, Sparkles, CheckCircle2, LogOut } from 'lucide-react';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
@@ -47,8 +49,24 @@ const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 export default function ChessPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const router = useRouter();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
+
+  const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
+  const [gameWinner, setGameWinner] = useState<string | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (hasPaidEntry && !gameWinner) {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
 
   const [board, setBoard] = useState<BoardMatrix>(INITIAL_BOARD);
   const [selectedSquare, setSelectedSquare] = useState<[number, number] | null>(null);
@@ -59,8 +77,6 @@ export default function ChessPage() {
   const [opponentName, setOpponentName] = useState<string>('Vikram_99');
   const [isOpponentThinking, setIsOpponentThinking] = useState<boolean>(false);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
-  const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
-  const [gameWinner, setGameWinner] = useState<string | null>(null);
 
   // Clocks: 10:00 (600s)
   const [whiteTimer, setWhiteTimer] = useState<number>(600);
@@ -467,7 +483,8 @@ export default function ChessPage() {
     <ProtectedRoute>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
-          href="/"
+          href="/#games-section"
+          onClick={handleBackToGames}
           className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -733,11 +750,19 @@ export default function ChessPage() {
                   </div>
 
                   <button
-                    onClick={handleStartMatch}
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
                     className="w-full py-3 rounded-2xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>Reset Chess Match (₹25 Stake)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                    className="w-full py-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Game</span>
                   </button>
 
                 </div>
@@ -747,6 +772,42 @@ export default function ChessPage() {
           )}
 
         </div>
+
+        <GameConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Start Next Match?'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'Exit Active Game?'
+              : 'Exit to All Games?'
+          }
+          message={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Are you sure you want to start the next match?'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+              : 'Are you sure you want to exit to All Games?'
+          }
+          confirmText={
+            confirmModal.type === 'NEXT_MATCH'
+              ? 'Yes, Start Match'
+              : confirmModal.type === 'LEAVE_GAME'
+              ? 'Yes, Leave Game'
+              : 'Yes, Exit'
+          }
+          cancelText="No, Keep Playing"
+          variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+          onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={() => {
+            setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+            if (confirmModal.type === 'NEXT_MATCH') {
+              handleStartMatch();
+            } else {
+              router.push('/#games-section');
+            }
+          }}
+        />
 
         {/* Pawn Promotion Modal Selection Choice */}
         {pendingPromotion && (

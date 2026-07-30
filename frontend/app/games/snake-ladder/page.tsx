@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import {
   ArrowLeft,
@@ -21,7 +22,12 @@ import {
   Sparkles,
   Skull,
   AlertTriangle,
+  Award,
+  AlertCircle,
+  HelpCircle,
+  LogOut,
 } from 'lucide-react';
+import { GameConfirmModal } from '../../../components/GameConfirmModal';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
@@ -243,11 +249,25 @@ function GamePawn({
 
 export default function SnakeLadderPage() {
   const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const router = useRouter();
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
   const DICE_SPIN_MS = 1800;
 
   const [hasPaidEntry, setHasPaidEntry] = useState<boolean>(false);
+  const [winner, setWinner] = useState<string | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'NEXT_MATCH' | 'LEAVE_GAME' | 'BACK_TO_GAMES';
+  }>({ isOpen: false, type: 'NEXT_MATCH' });
+
+  const handleBackToGames = (e: React.MouseEvent) => {
+    if (hasPaidEntry && !winner) {
+      e.preventDefault();
+      setConfirmModal({ isOpen: true, type: 'BACK_TO_GAMES' });
+    }
+  };
   const [roomCode, setRoomCode] = useState<string>('SNAKE-8842');
   const [copiedRoomCode, setCopiedRoomCode] = useState<boolean>(false);
 
@@ -260,7 +280,6 @@ export default function SnakeLadderPage() {
   const [cubeRotation, setCubeRotation] = useState<{ x: number; y: number }>(() => ({ ...FACE_ROTATIONS[6] }));
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [isOpponentThinking, setIsOpponentThinking] = useState<boolean>(false);
-  const [winner, setWinner] = useState<string | null>(null);
 
   const [eventBanner, setEventBanner] = useState<{ type: 'snake' | 'ladder' | 'win' | 'bonus' | 'forfeit'; message: string } | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -759,7 +778,8 @@ export default function SnakeLadderPage() {
     <ProtectedRoute>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Link
-          href="/"
+          href="/#games-section"
+          onClick={handleBackToGames}
           className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -941,11 +961,19 @@ export default function SnakeLadderPage() {
                   </button>
 
                   <button
-                    onClick={handleStartMatch}
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'NEXT_MATCH' })}
                     className="w-full py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center space-x-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     <span>New Match (₹10 Stake)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setConfirmModal({ isOpen: true, type: 'LEAVE_GAME' })}
+                    className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all flex items-center justify-center space-x-2 mt-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Game</span>
                   </button>
                 </div>
               </div>
@@ -953,6 +981,42 @@ export default function SnakeLadderPage() {
           )}
         </div>
       </div>
+
+      <GameConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={
+          confirmModal.type === 'NEXT_MATCH'
+            ? 'Start Next Match?'
+            : confirmModal.type === 'LEAVE_GAME'
+            ? 'Exit Active Game?'
+            : 'Exit to All Games?'
+        }
+        message={
+          confirmModal.type === 'NEXT_MATCH'
+            ? 'Are you sure you want to start the next match?'
+            : confirmModal.type === 'LEAVE_GAME'
+            ? 'You are currently in an active game. Leaving now will exit the current game. Are you sure you want to leave?'
+            : 'Are you sure you want to exit to All Games?'
+        }
+        confirmText={
+          confirmModal.type === 'NEXT_MATCH'
+            ? 'Yes, Start Match'
+            : confirmModal.type === 'LEAVE_GAME'
+            ? 'Yes, Leave Game'
+            : 'Yes, Exit'
+        }
+        cancelText="No, Keep Playing"
+        variant={confirmModal.type === 'NEXT_MATCH' ? 'warning' : 'danger'}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={() => {
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          if (confirmModal.type === 'NEXT_MATCH') {
+            handleStartMatch();
+          } else {
+            router.push('/#games-section');
+          }
+        }}
+      />
 
       <style jsx global>{`
         @keyframes pawnHop {
