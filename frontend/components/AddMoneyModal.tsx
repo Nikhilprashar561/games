@@ -381,7 +381,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'PhonePe')}
                       className="p-2 rounded-xl bg-[#5F259F]/20 hover:bg-[#5F259F]/40 border border-[#5F259F]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <img src="/images/phonepe.jpeg" alt="PhonePe" className="w-7 h-7 object-contain rounded-lg" />
+                      <img src="/images/phone pe.png" alt="PhonePe" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">PhonePe</span>
                     </a>
 
@@ -391,7 +391,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'Google Pay')}
                       className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <img src="/images/gpay.jpeg" alt="Google Pay" className="w-7 h-7 object-contain rounded-lg" />
+                      <img src="/images/google pay.png" alt="Google Pay" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">GPay</span>
                     </a>
 
@@ -401,7 +401,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
                       className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <img src="/images/paytm.jpeg" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
+                      <img src="/images/paytm.png" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">Paytm</span>
                     </a>
 
@@ -411,7 +411,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'BHIM / UPI')}
                       className="p-2 rounded-xl bg-[#008853]/20 hover:bg-[#008853]/40 border border-[#008853]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <img src="/images/bhim.jpeg" alt="BHIM" className="w-7 h-7 object-contain rounded-lg" />
+                      <img src="/images/bhim.png" alt="BHIM" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">BHIM</span>
                     </a>
                   </div>
