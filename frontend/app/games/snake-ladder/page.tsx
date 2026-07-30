@@ -242,7 +242,7 @@ function GamePawn({
 }
 
 export default function SnakeLadderPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
   const DICE_SPIN_MS = 1800;
@@ -359,9 +359,17 @@ export default function SnakeLadderPage() {
   };
 
   const handleStartMatch = async () => {
-    if (!user) return;
-    if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Snake & Ladder.`);
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    if (playMode === 'DEMO') {
+      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+      return;
+    }
+    const currentBalance = user?.walletBalance || 0;
+    if (currentBalance < ENTRY_COST) {
+      showToast(`Insufficient Real Money balance! Entry fee is ₹${ENTRY_COST}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
       return;
     }
     if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);

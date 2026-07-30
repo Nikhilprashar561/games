@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { User, GameMatchLog, GameStats, DepositRequest, AdminSettings } from '../types';
+import { ToastContainer, ToastItem } from '../components/ToastContainer';
 
 export type PlayMode = 'REAL' | 'DEMO';
 
@@ -14,6 +15,7 @@ interface AuthContextType {
   welcomeToast: string | null;
   playMode: PlayMode;
   setPlayMode: (mode: PlayMode) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
   sendOTP: (email: string) => Promise<{ isExistingUser: boolean }>;
@@ -97,11 +99,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = 'toast_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const newToast: ToastItem = { id, message, type };
+    setToasts((prev) => [...prev.slice(-4), newToast]);
+
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const setPlayMode = (mode: PlayMode) => {
     setPlayModeState(mode);
     localStorage.setItem('baazi_play_mode', mode);
-    setWelcomeToast(`Switched to ${mode === 'REAL' ? '💰 Real Money Play' : '🎮 Demo Play Mode (Free Coins)'}`);
-    setTimeout(() => setWelcomeToast(null), 3000);
+    showToast(`Switched to ${mode === 'REAL' ? '💰 Real Money Play' : '🎮 Demo Play Mode (Free Coins)'}`, 'info');
   };
 
   // Sync session with backend me endpoint
@@ -151,15 +168,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         closeAuthModal();
 
-        setWelcomeToast(`Welcome back, ${newUser.name}! Direct login successful. 🎉`);
-        setTimeout(() => setWelcomeToast(null), 3000);
+        showToast(`Welcome back, ${newUser.name}! Login successful 🎉`, 'success');
+        if (res.data.claimedBonusNow) {
+          setTimeout(() => {
+            showToast(`🎉 Welcome Bonus! 1,000 Demo Coins credited to your account!`, 'success');
+          }, 500);
+        }
 
         return { isExistingUser: true };
       }
 
       // FIRST TIME USER -> OTP SENT TO EMAIL
+      showToast(`4-Digit OTP sent to ${email}. Check console/dev mode (1234)`, 'info');
       return { isExistingUser: false };
     } catch (err: any) {
+      showToast(err.response?.data?.message || 'Failed to process email login', 'error');
       throw new Error(err.response?.data?.message || 'Failed to process email login');
     }
   };
@@ -171,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.data.success) {
         const newToken = res.data.token;
         const newUser = res.data.user;
-        if (newUser.demoBalance === undefined) newUser.demoBalance = 10000;
+        if (newUser.demoBalance === undefined) newUser.demoBalance = 1000;
 
         localStorage.setItem('token', newToken);
         localStorage.setItem('user_session', JSON.stringify(newUser));
@@ -181,10 +204,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newUser);
         closeAuthModal();
 
-        setWelcomeToast(`Welcome to Baazi Board Arena, ${newUser.name}! 🎉`);
-        setTimeout(() => setWelcomeToast(null), 3000);
+        showToast(`Welcome to Baazi Board Arena, ${newUser.name}! 🎉`, 'success');
+        if (res.data.claimedBonusNow) {
+          setTimeout(() => {
+            showToast(`🎉 First Time Reward! 1,000 Demo Coins credited to your wallet!`, 'success');
+          }, 500);
+        }
       }
     } catch (err: any) {
+      showToast(err.response?.data?.message || 'Invalid 4-digit OTP. Use 1234 in preview mode!', 'error');
       throw new Error(err.response?.data?.message || 'Invalid 4-digit OTP. Please try again!');
     }
   };
@@ -203,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    showToast('Logged out successfully', 'info');
   };
 
   const updateWalletBalance = async (delta: number): Promise<number> => {
@@ -211,6 +240,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...user, walletBalance: newBal };
     setUser(updated);
     localStorage.setItem('user_session', JSON.stringify(updated));
+
+    if (delta < 0) showToast(`₹${Math.abs(delta)} Real Cash deducted`, 'info');
+    else if (delta > 0) showToast(`₹${delta} Real Cash added!`, 'success');
 
     if (token) {
       try {
@@ -223,12 +255,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateDemoBalance = (delta: number): number => {
-    if (!user) return 10000;
-    const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 10000;
+    if (!user) return 1000;
+    const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 1000;
     const newDemo = Math.max(0, currentDemo + delta);
     const updated = { ...user, demoBalance: newDemo };
     setUser(updated);
     localStorage.setItem('user_session', JSON.stringify(updated));
+
+    if (delta < 0) showToast(`🪙 ${Math.abs(delta)} Demo Coins deducted`, 'info');
+    else if (delta > 0) showToast(`🪙 ${delta} Demo Coins added!`, 'success');
+
     return newDemo;
   };
 
@@ -595,6 +631,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         welcomeToast,
         playMode,
         setPlayMode,
+        showToast,
         openAuthModal,
         closeAuthModal,
         sendOTP,
@@ -627,6 +664,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fetchAdminGameLogs,
       }}
     >
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       {children}
     </AuthContext.Provider>
   );

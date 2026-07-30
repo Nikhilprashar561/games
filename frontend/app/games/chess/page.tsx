@@ -46,7 +46,7 @@ const STAUNTON_SYMBOLS: Record<string, string> = {
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 export default function ChessPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
 
@@ -331,9 +331,13 @@ export default function ChessPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (playMode === 'DEMO') {
+      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+      return;
+    }
+    const currentBalance = user?.walletBalance || 0;
     if (currentBalance < ENTRY_COST) {
-      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
+      showToast(`Insufficient Real Money balance! Entry fee is ₹${ENTRY_COST}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
       return;
     }
     await updateWalletBalance(-ENTRY_COST);

@@ -42,6 +42,14 @@ export const sendOTP = async (req: Request, res: Response) => {
 
       // EXISTING USER -> DIRECT LOGIN ACCEPTED WITHOUT OTP!
       if (user && user.isVerified) {
+        let claimedBonusNow = false;
+        if (!user.hasClaimedSignupBonus) {
+          user.demoBalance = 1000;
+          user.hasClaimedSignupBonus = true;
+          claimedBonusNow = true;
+          await user.save();
+        }
+
         const token = generateToken(user._id.toString(), user.email);
         return res.json({
           success: true,
@@ -52,10 +60,13 @@ export const sendOTP = async (req: Request, res: Response) => {
             name: user.name,
             email: user.email,
             walletBalance: user.walletBalance,
+            demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000,
             upiId: user.upiId,
             avatar: user.avatar,
             isVerified: true,
+            hasClaimedSignupBonus: user.hasClaimedSignupBonus,
           },
+          claimedBonusNow,
           message: `Welcome back, ${user.name}! Direct login successful.`,
         });
       }
@@ -176,6 +187,13 @@ export const verifyOTP = async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Invalid 4-Digit OTP. Use 1234 in Preview mode!' });
       }
 
+      let claimedBonusNow = false;
+      if (!user.hasClaimedSignupBonus) {
+        user.demoBalance = 1000;
+        user.hasClaimedSignupBonus = true;
+        claimedBonusNow = true;
+      }
+
       // Mark User as Verified!
       user.isVerified = true;
       user.otp = undefined;
@@ -192,10 +210,13 @@ export const verifyOTP = async (req: Request, res: Response) => {
           name: user.name,
           email: user.email,
           walletBalance: user.walletBalance,
+          demoBalance: user.demoBalance,
           upiId: user.upiId,
           avatar: user.avatar,
           isVerified: user.isVerified,
+          hasClaimedSignupBonus: user.hasClaimedSignupBonus,
         },
+        claimedBonusNow,
       });
     } catch (dbErr) {
       let mockUser = fallbackUsers.get(cleanEmail);

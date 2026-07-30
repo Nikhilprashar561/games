@@ -13,13 +13,7 @@ interface AddMoneyModalProps {
 }
 
 export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, initialTab = 'DEPOSIT' }) => {
-  const {
-    user,
-    submitDepositUTR,
-    submitWithdrawal,
-    fetchMyDeposits,
-    fetchPublicPaymentConfig,
-  } = useAuth();
+  const { user, submitDepositUTR, submitWithdrawal, fetchMyDeposits, fetchPublicPaymentConfig, showToast } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'STATUS' | 'WITHDRAW'>(initialTab);
 
@@ -166,6 +160,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
     try {
       const res = await submitDepositUTR(numAmount, cleanRef, 'UPI_QR');
       if (res.success) {
+        showToast(`🎉 Request for ₹${numAmount} (Ref: ${cleanRef}) submitted! Credit under 10 minutes.`, 'success');
         setFeedback({
           type: 'success',
           message: `🎉 Your request for ₹${numAmount} (Ref: ${cleanRef}) has been submitted! Your amount will be credited to your wallet under 10 minutes after verification.`,

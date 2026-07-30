@@ -182,7 +182,7 @@ function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rol
 const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (max - min));
 
 export default function LudoPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
 
@@ -229,7 +229,7 @@ export default function LudoPage() {
     ? [userColor, 'green', 'yellow']
     : ['red', 'green', 'yellow', 'blue'];
 
-  const showToast = (type: 'capture' | 'safe' | 'home', message: string) => {
+  const showLudoBanner = (type: 'capture' | 'safe' | 'home', message: string) => {
     setPopupBanner({ type, message });
     setTimeout(() => {
       setPopupBanner(null);
@@ -248,9 +248,13 @@ export default function LudoPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (playMode === 'DEMO') {
+      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+      return;
+    }
+    const currentBalance = user?.walletBalance || 0;
     if (currentBalance < ENTRY_COST) {
-      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
+      showToast(`Insufficient Real Money balance! Entry fee is ₹${ENTRY_COST}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
       return;
     }
     await updateWalletBalance(-ENTRY_COST);
@@ -475,7 +479,7 @@ export default function LudoPage() {
       updateTokensState(newTokens);
       setTravelingTokenId(null);
       setHasRolled(false);
-      showToast('safe', `⭐ Token Unlocked to Start Cell!`);
+      showLudoBanner('safe', `⭐ Token Unlocked to Start Cell!`);
 
       if (color !== userColor) {
         setTimeout(() => opponentAutoPlay(), 600);
@@ -499,7 +503,7 @@ export default function LudoPage() {
 
       if (currentStep === 57) {
         tok.position = 200;
-        showToast('home', `🏆 Token Reached CENTER HOME!`);
+        showLudoBanner('home', `🏆 Token Reached CENTER HOME!`);
       } else if (currentStep > 51) {
         tok.position = 100 + (currentStep - 52);
       } else {
@@ -524,13 +528,13 @@ export default function LudoPage() {
                 enemy.position = -1;
                 enemy.stepCount = 0;
                 captured = true;
-                showToast('capture', `⚔️ TOKEN CAPTURED! Extra Turn Granted!`);
+                showLudoBanner('capture', `⚔️ TOKEN CAPTURED! Extra Turn Granted!`);
                 break;
               }
             }
           }
         } else if (tok.position < 100 && SAFE_INDEXES.includes(tok.position)) {
-          showToast('safe', `⭐ SAFE ZONE! Token is Protected!`);
+          showLudoBanner('safe', `⭐ SAFE ZONE! Token is Protected!`);
         }
 
         if (newTokens[color].every((t) => t.position === 200)) {

@@ -187,7 +187,7 @@ const colorHex: Record<PieceKind, string> = {
  * COMPONENT
  * ==========================================================================*/
 export default function CarromPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -285,9 +285,13 @@ export default function CarromPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (playMode === 'DEMO') {
+      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+      return;
+    }
+    const currentBalance = user?.walletBalance || 0;
     if (currentBalance < entryCost) {
-      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + entryCost : entryCost + ' Demo Coins'}. Please switch mode or deposit cash.`);
+      showToast(`Insufficient Real Money balance! Entry fee is ₹${entryCost}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
       return;
     }
     await updateWalletBalance(-entryCost);

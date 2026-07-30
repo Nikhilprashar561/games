@@ -586,7 +586,7 @@ function CardBack({ small }: { small?: boolean }) {
 // ============================================================================
 
 export default function TeenPattiPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const [state, dispatch] = useReducer(reducer, LOBBY_STATE);
   const stateRef = useRef(state);
   const settledRef = useRef<string | null>(null);
@@ -728,9 +728,13 @@ export default function TeenPattiPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (playMode === 'DEMO') {
+      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+      return;
+    }
+    const currentBalance = user?.walletBalance || 0;
     if (currentBalance < state.bootAmount) {
-      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Boot amount is ${playMode === 'REAL' ? '₹' + state.bootAmount : state.bootAmount + ' Demo Coins'}. Please switch mode or deposit cash.`);
+      showToast(`Insufficient Real Money balance! Boot amount is ₹${state.bootAmount}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
       return;
     }
     await updateWalletBalance(-state.bootAmount);

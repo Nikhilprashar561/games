@@ -14,6 +14,7 @@ export interface IUser extends Document {
   pendingEmail?: string;
   pendingEmailOtp?: string;
   pendingEmailOtpExpires?: Date;
+  hasClaimedSignupBonus: boolean;
   createdAt: Date;
 }
 
@@ -74,6 +75,10 @@ const UserSchema: Schema = new Schema({
   pendingEmailOtpExpires: {
     type: Date,
     default: null,
+  },
+  hasClaimedSignupBonus: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,
