@@ -41,10 +41,10 @@ const ENTRY_COST = 10;
 
 // Payout structure — 25 of 100 tiles pay out (25% odds), the rest are empty.
 const PAYOUT_TIERS = [
-  { amount: 250, count: 2 },
-  { amount: 100, count: 5 },
-  { amount: 50, count: 8 },
-  { amount: 20, count: 10 },
+  { amount: 50, count: 2 },
+  { amount: 25, count: 5 },
+  { amount: 15, count: 8 },
+  { amount: 12, count: 10 },
 ];
 const TOTAL_TILES = 100;
 const WIN_TILE_COUNT = PAYOUT_TIERS.reduce((sum, t) => sum + t.count, 0);
@@ -89,8 +89,10 @@ export default function NumberPredictPage() {
 
   const initializeVault = () => {
     const numbers = shuffle(Array.from({ length: TOTAL_TILES }, (_, i) => i + 1));
+    const isDemo = playMode === 'DEMO';
+    const multiplier = isDemo ? 10 : 1;
     const rewardsPool = shuffle([
-      ...PAYOUT_TIERS.flatMap((t) => Array(t.count).fill(t.amount)),
+      ...PAYOUT_TIERS.flatMap((t) => Array(t.count).fill(t.amount * multiplier)),
       ...Array(EMPTY_TILE_COUNT).fill(0),
     ]);
 
@@ -204,7 +206,7 @@ export default function NumberPredictPage() {
 
             <div className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-extrabold text-sm">
               <Wallet className="w-4 h-4" />
-              <span>Entry: ₹{ENTRY_COST} | Win up to ₹250</span>
+              <span>{playMode === 'REAL' ? `Entry: ₹${ENTRY_COST} | Win up to ₹50` : `Entry: 🪙 ${ENTRY_COST * 10} | Win up to 🪙 500`}</span>
             </div>
           </div>
 
@@ -215,10 +217,11 @@ export default function NumberPredictPage() {
               </div>
 
               <div className="max-w-md mx-auto space-y-2">
-                <h2 className="text-2xl font-black font-['Space_Grotesk']">Reveal 1 Tile, Win Up to ₹250</h2>
+                <h2 className="text-2xl font-black font-['Space_Grotesk']">{playMode === 'REAL' ? 'Reveal 1 Tile, Win Up to ₹50' : 'Reveal 1 Tile, Win Up to 🪙 500'}</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Pay a ₹{ENTRY_COST} entry to open a freshly shuffled 100-tile vault. 25 tiles pay out real cash,
-                  straight to your wallet.
+                  {playMode === 'REAL'
+                    ? `Pay a ₹${ENTRY_COST} entry to open a freshly shuffled 100-tile vault. 25 tiles pay out real cash, straight to your wallet.`
+                    : `Pay 🪙 ${ENTRY_COST * 10} Demo Coins to open a freshly shuffled 100-tile vault. 25 tiles pay out practice coins.`}
                 </p>
               </div>
 
@@ -229,7 +232,9 @@ export default function NumberPredictPage() {
                     key={tier.amount}
                     className="py-3 px-2 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center"
                   >
-                    <span className="text-lg font-black text-emerald-500">₹{tier.amount}</span>
+                    <span className="text-lg font-black text-emerald-500">
+                      {playMode === 'REAL' ? `₹${tier.amount}` : `🪙 ${tier.amount * 10}`}
+                    </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">{tier.count} tiles</span>
                   </div>
                 ))}
@@ -242,7 +247,7 @@ export default function NumberPredictPage() {
                 onClick={handleEnter}
                 className="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-lg shadow-xl shadow-emerald-500/25 transition-all transform hover:scale-105"
               >
-                Pay ₹{ENTRY_COST} & Open the Vault
+                {playMode === 'REAL' ? `Pay ₹${ENTRY_COST} & Open Vault` : `Pay 🪙 ${ENTRY_COST * 10} & Open Vault`}
               </button>
             </div>
           ) : (

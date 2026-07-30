@@ -82,7 +82,7 @@ export const gamesData: GameInfo[] = [
     id: '7',
     title: 'Number Predict & Win',
     slug: 'number-predict',
-    description: 'Shuffled 1-100 mystery grid! Strict 25% cash reward odds with real money wallet payouts.',
+    description: 'Shuffled 1-100 mystery grid! 25% cash reward odds with real money payouts up to ₹50.',
     image: '/images/number_predict_cover.jpeg',
     isProtected: true,
     category: 'Jackpot & Luck',
