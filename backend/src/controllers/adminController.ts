@@ -289,7 +289,7 @@ export const adjustUserBalance = async (req: Request, res: Response) => {
     } else if (type === 'SET_REAL_EXACT') {
       user.walletBalance = Math.max(0, change);
     } else if (type === 'DEMO') {
-      user.demoBalance = Math.max(0, (user.demoBalance !== undefined ? user.demoBalance : 10000) + change);
+      user.demoBalance = Math.max(0, (user.demoBalance !== undefined ? user.demoBalance : 1000) + change);
     } else {
       user.walletBalance = Math.max(0, (user.walletBalance || 0) + change);
     }

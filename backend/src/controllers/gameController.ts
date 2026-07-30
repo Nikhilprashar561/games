@@ -56,7 +56,7 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
           user.walletBalance = Math.max(0, (user.walletBalance || 0) + balanceDelta);
         }
       } else {
-        const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 10000;
+        const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 1000;
         user.demoBalance = Math.max(0, currentDemo + balanceDelta);
       }
 

@@ -87,7 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        if (parsed.demoBalance === undefined) parsed.demoBalance = 10000;
+        if (parsed.demoBalance === undefined || parsed.demoBalance === 10000) {
+          parsed.demoBalance = 1000;
+          localStorage.setItem('user_session', JSON.stringify(parsed));
+        }
         setUser(parsed);
       } catch (e) {
         // ignore
@@ -133,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const res = await axios.get('/api/auth/me');
         if (res.data.success) {
           const freshUser = res.data.user;
-          if (freshUser.demoBalance === undefined) freshUser.demoBalance = 10000;
+          if (freshUser.demoBalance === undefined || freshUser.demoBalance === 10000) freshUser.demoBalance = 1000;
           setUser(freshUser);
           localStorage.setItem('user_session', JSON.stringify(freshUser));
         }

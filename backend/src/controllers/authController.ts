@@ -227,7 +227,7 @@ export const verifyOTP = async (req: Request, res: Response) => {
           name: displayName,
           email: cleanEmail,
           walletBalance: 0,
-          demoBalance: 10000,
+          demoBalance: 1000,
           upiId: `${displayName}@paytm`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
           isVerified: true,
