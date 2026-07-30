@@ -37,10 +37,10 @@ const INITIAL_BOARD: BoardMatrix = [
   ],
 ];
 
-// Official Staunton Render Symbols
+// Official Staunton Render Symbols with Text Presentation Variation Selector (\uFE0E) to prevent emoji color rendering
 const STAUNTON_SYMBOLS: Record<string, string> = {
-  w_k: '♔', w_q: '♕', w_r: '♖', w_b: '♗', w_n: '♘', w_p: '♙',
-  b_k: '♚', b_q: '♛', b_r: '♜', b_b: '♝', b_n: '♞', b_p: '♟',
+  w_k: '♔\uFE0E', w_q: '♕\uFE0E', w_r: '♖\uFE0E', w_b: '♗\uFE0E', w_n: '♘\uFE0E', w_p: '♙\uFE0E',
+  b_k: '♚\uFE0E', b_q: '♛\uFE0E', b_r: '♜\uFE0E', b_b: '♝\uFE0E', b_n: '♞\uFE0E', b_p: '♟\uFE0E',
 };
 
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -618,7 +618,7 @@ export default function ChessPage() {
                               {piece ? (
                                 <span className={`transform transition-transform duration-200 ${
                                   isSelected ? 'scale-125' : 'hover:scale-110'
-                                } ${piece.color === 'w' ? 'text-white drop-shadow-[0_3px_5px_rgba(0,0,0,0.9)]' : 'text-slate-950 drop-shadow-[0_2px_4px_rgba(255,255,255,0.6)]'}`}>
+                                } ${piece.color === 'w' ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]' : 'text-black drop-shadow-[0_1px_2px_rgba(255,255,255,0.4)]'}`}>
                                   {STAUNTON_SYMBOLS[`${piece.color}_${piece.type}`]}
                                 </span>
                               ) : null}
