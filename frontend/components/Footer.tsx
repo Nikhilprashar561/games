@@ -32,25 +32,30 @@ export const Footer: React.FC = () => {
               className="hover:text-emerald-400 transition-colors flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700"
             >
               <Gamepad2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>All Games</span>
+              <span>All Skill Games</span>
             </a>
             
-            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800">
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-emerald-400">
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>100% Safe & Secure</span>
+              <span>Supreme Court Recognized Skill Games</span>
             </div>
 
-            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800">
-              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Instant Multiplayer</span>
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-amber-400">
+              <Terminal className="w-3.5 h-3.5 text-amber-400" />
+              <span>🔞 18+ Only</span>
             </div>
           </div>
 
           {/* Tagline */}
-          <div className="text-xs text-slate-400 flex items-center justify-center space-x-1 font-semibold">
-            <span>Built with</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-current animate-pulse" />
-            <span>for Online Gamers</span>
+          <div className="text-xs text-slate-400 flex flex-col items-center md:items-end justify-center font-semibold">
+            <div className="flex items-center space-x-1">
+              <span>Built with</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500 fill-current animate-pulse" />
+              <span>for Skill Gamers</span>
+            </div>
+            <p className="text-[10px] text-slate-500 max-w-xs mt-1 text-center md:text-right">
+              Baazi Board offers eSports skill-based contests (Chess, Carrom, Ludo, Tic-Tac-Toe). Play responsibly.
+            </p>
           </div>
 
         </div>

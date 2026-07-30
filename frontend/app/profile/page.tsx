@@ -1,5 +1,7 @@
 'use client';
 
+import { formatCurrency } from '../../utils/formatCurrency';
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
@@ -168,7 +170,7 @@ export default function ProfilePage() {
                   <span>Real Money Wallet</span>
                 </div>
                 <p className="text-3xl font-black text-emerald-400 mt-1 font-['Space_Grotesk']">
-                  ₹{user?.walletBalance ?? 0}
+                  ₹{formatCurrency(user?.walletBalance)}
                 </p>
                 <p className="text-[10px] font-bold text-slate-400 mt-0.5">
                   UPI: {user?.upiId || 'user@paytm'}

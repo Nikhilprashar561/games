@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { AddMoneyModal } from './AddMoneyModal';
 import { LogOut, User as UserIcon, ChevronDown, Play, Dices, Wallet, PlusCircle, Shield, Coins, History, Trophy, Sparkles, RefreshCw, Menu, KeyRound } from 'lucide-react';
+import { formatCurrency, formatCoins } from '../utils/formatCurrency';
 
 export const Navbar: React.FC = () => {
   const { user, openAuthModal, logout, welcomeToast, playMode, setPlayMode } = useAuth();
@@ -39,8 +40,8 @@ export const Navbar: React.FC = () => {
     setDropdownOpen(false);
   };
 
-  const walletDisplayBalance = user ? (user.walletBalance || 0) : 0;
-  const demoDisplayCoins = user ? (user.demoBalance !== undefined ? user.demoBalance : 10000) : 10000;
+  const walletDisplayBalance = formatCurrency(user?.walletBalance);
+  const demoDisplayCoins = formatCoins(user?.demoBalance !== undefined ? user.demoBalance : 1000);
 
   // DEDICATED CLEAN ADMIN HEADER (NO PLAYER OPTIONS)
   if (isAdminRoute) {
@@ -243,11 +244,11 @@ export const Navbar: React.FC = () => {
                         <div className="mt-2.5 pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs font-bold">
                           <div className="p-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                             <span className="text-[9px] text-slate-400 font-semibold block uppercase">Real Cash</span>
-                            <span>₹{user.walletBalance || 0}</span>
+                            <span>₹{walletDisplayBalance}</span>
                           </div>
                           <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
                             <span className="text-[9px] text-slate-400 font-semibold block uppercase">Demo Coins</span>
-                            <span>🪙 {user.demoBalance !== undefined ? user.demoBalance : 10000}</span>
+                            <span>🪙 {demoDisplayCoins}</span>
                           </div>
                         </div>
                       </div>

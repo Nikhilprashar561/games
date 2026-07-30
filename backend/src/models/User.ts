@@ -36,7 +36,7 @@ const UserSchema: Schema = new Schema({
   },
   demoBalance: {
     type: Number,
-    default: 10000, // ₹10,000 Demo Coins for Practice Play
+    default: 1000, // 1,000 Demo Coins on Registration
   },
   role: {
     type: String,

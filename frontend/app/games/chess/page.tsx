@@ -7,6 +7,7 @@ import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { ArrowLeft, RotateCcw, Clock, ShieldCheck, Zap, Wallet, Trophy, User, Crown, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 
 type PieceType = 'p' | 'r' | 'n' | 'b' | 'q' | 'k';
 type PieceColor = 'w' | 'b';
@@ -45,7 +46,7 @@ const STAUNTON_SYMBOLS: Record<string, string> = {
 const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 export default function ChessPage() {
-  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
 
@@ -326,9 +327,13 @@ export default function ChessPage() {
   };
 
   const handleStartMatch = async () => {
-    if (!user) return;
-    if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Chess match.`);
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < ENTRY_COST) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
     await updateWalletBalance(-ENTRY_COST);

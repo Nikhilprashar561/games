@@ -10,8 +10,10 @@ import { useAuth } from '../../../context/AuthContext';
 
 type BoardState = Array<string | null>;
 
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
+
 export default function TicTacToePage() {
-  const { user, recordGameMatch, openAuthModal } = useAuth();
+  const { user, recordGameMatch, openAuthModal, playMode, setPlayMode } = useAuth();
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
 
@@ -117,6 +119,12 @@ export default function TicTacToePage() {
 
     if (!user) {
       openAuthModal();
+      return;
+    }
+
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < ENTRY_COST) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
 

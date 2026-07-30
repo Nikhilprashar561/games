@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 
 // Snakes & Ladders Map (100-cell Boustrophedon Board)
 const LADDERS_MAP: Record<number, number> = {
@@ -241,7 +242,7 @@ function GamePawn({
 }
 
 export default function SnakeLadderPage() {
-  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
   const DICE_SPIN_MS = 1800;
@@ -529,6 +530,17 @@ export default function SnakeLadderPage() {
 
   const rollDice = () => {
     if (isRolling || isOpponentThinking || turn !== 'player' || !!winner) return;
+
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < ENTRY_COST) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
+      return;
+    }
     const finalRoll = Math.floor(Math.random() * 6) + 1;
     setIsRolling(true);
     playSound('roll');

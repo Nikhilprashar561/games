@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatCoins } from '../../utils/formatCurrency';
 import { DepositRequest, AdminSettings, User } from '../../types';
 import { Shield, Lock, Search, CheckCircle2, XCircle, Clock, RefreshCw, Save, QrCode, CreditCard, Users, ArrowUpRight, Check, AlertCircle, KeyRound, Sparkles, Upload, Image as ImageIcon, Coins, Wallet, PlusCircle, Trophy } from 'lucide-react';
 
@@ -721,11 +722,11 @@ export default function AdminPage() {
                         </td>
 
                         <td className="py-4 px-4 font-black text-sm text-emerald-400">
-                          ₹{u.walletBalance || 0}
+                          ₹{formatCurrency(u.walletBalance)}
                         </td>
 
                         <td className="py-4 px-4 font-black text-sm text-amber-400">
-                          🪙 {u.demoBalance !== undefined ? u.demoBalance : 10000}
+                          🪙 {formatCoins(u.demoBalance !== undefined ? u.demoBalance : 1000)}
                         </td>
 
                         <td className="py-4 px-4 font-semibold text-slate-400">

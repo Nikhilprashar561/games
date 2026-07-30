@@ -3,6 +3,7 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import {
   ArrowLeft,
@@ -585,7 +586,7 @@ function CardBack({ small }: { small?: boolean }) {
 // ============================================================================
 
 export default function TeenPattiPage() {
-  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
   const [state, dispatch] = useReducer(reducer, LOBBY_STATE);
   const stateRef = useRef(state);
   const settledRef = useRef<string | null>(null);
@@ -723,9 +724,13 @@ export default function TeenPattiPage() {
   }, [state.phase, state.result]);
 
   const startMatch = async () => {
-    if (!user) return;
-    if ((user.walletBalance || 0) < state.bootAmount) {
-      alert(`Insufficient wallet balance! You need ₹${state.bootAmount} to enter Teen Patti.`);
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < state.bootAmount) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Boot amount is ${playMode === 'REAL' ? '₹' + state.bootAmount : state.bootAmount + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
     await updateWalletBalance(-state.bootAmount);

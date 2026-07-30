@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import {
   ArrowLeft,
@@ -181,7 +182,7 @@ function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rol
 const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (max - min));
 
 export default function LudoPage() {
-  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
 
@@ -243,9 +244,13 @@ export default function LudoPage() {
   };
 
   const handleStartMatch = async () => {
-    if (!user) return;
-    if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to enter Ludo match.`);
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < ENTRY_COST) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
     await updateWalletBalance(-ENTRY_COST);

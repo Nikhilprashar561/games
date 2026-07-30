@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../context/AuthContext';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import {
   ArrowLeft,
@@ -56,7 +57,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function NumberPredictPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
 
   const [hasEntered, setHasEntered] = useState(false);
   const [tiles, setTiles] = useState<VaultTile[]>([]);
@@ -85,8 +86,9 @@ export default function NumberPredictPage() {
       openAuthModal();
       return;
     }
-    if ((user.walletBalance || 0) < ENTRY_COST) {
-      alert(`Insufficient wallet balance! You need ₹${ENTRY_COST} to reveal a tile.`);
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < ENTRY_COST) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
 

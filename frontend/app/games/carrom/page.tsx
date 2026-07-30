@@ -7,6 +7,7 @@ import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { ArrowLeft, ShieldCheck, Trophy, Wallet, RotateCcw, Target, Clock, Crown, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 
 /* ============================================================================
  * GEOMETRY — logical canvas is a fixed 640x640 coordinate space, scaled to
@@ -186,7 +187,7 @@ const colorHex: Record<PieceKind, string> = {
  * COMPONENT
  * ==========================================================================*/
 export default function CarromPage() {
-  const { user, updateWalletBalance, recordGameMatch } = useAuth();
+  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode } = useAuth();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -280,9 +281,13 @@ export default function CarromPage() {
   }, []);
 
   const handleStartMatch = async () => {
-    if (!user) return;
-    if ((user.walletBalance || 0) < entryCost) {
-      alert(`Insufficient wallet balance! You need ₹${entryCost} to enter Carrom arena.`);
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < entryCost) {
+      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + entryCost : entryCost + ' Demo Coins'}. Please switch mode or deposit cash.`);
       return;
     }
     await updateWalletBalance(-entryCost);
