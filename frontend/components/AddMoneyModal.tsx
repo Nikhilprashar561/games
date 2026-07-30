@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { DepositRequest, AdminSettings } from '../types';
-import { X, QrCode, Copy, Check, Clock, CheckCircle2, XCircle, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Wallet, Download, Zap, Coins } from 'lucide-react';
+import { X, QrCode, Copy, Check, Clock, CheckCircle2, XCircle, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, Wallet, Zap } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
 interface AddMoneyModalProps {
@@ -54,7 +54,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'DEPOSIT' | 'STATUS' | 'WITHDRAW'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'UPI' | 'CRYPTO'>('UPI');
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -68,14 +67,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
   // Form states
   const [amount, setAmount] = useState<string>('500');
   const [utr, setUtr] = useState<string>('');
-  const [cryptoTxid, setCryptoTxid] = useState<string>('');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('200');
   const [withdrawDetails, setWithdrawDetails] = useState<string>('');
   
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
   const [copiedBank, setCopiedBank] = useState<boolean>(false);
-  const [copiedCrypto, setCopiedCrypto] = useState<boolean>(false);
   
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -94,7 +91,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
 
   const PRESET_AMOUNTS = [100, 200, 500, 1000, 2000];
-  const DEFAULT_USDT_ADDRESS = 'TXb9KzR7pZ79Vb94N1mQW9xL2p88YkZ77';
 
   useEffect(() => {
     if (isOpen) {
@@ -171,18 +167,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
     }
   };
 
-  const handleCopyCrypto = () => {
-    navigator.clipboard.writeText(DEFAULT_USDT_ADDRESS);
-    setCopiedCrypto(true);
-    setTimeout(() => setCopiedCrypto(false), 2000);
-  };
-
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback(null);
 
     const numAmount = Number(amount);
-    const cleanRef = depositMethod === 'UPI' ? utr.trim() : cryptoTxid.trim();
+    const cleanRef = utr.trim();
 
     if (!numAmount || numAmount < 10) {
       setFeedback({ type: 'error', message: 'Please enter a valid deposit amount (min ₹10)' });
@@ -192,23 +182,20 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
     if (!cleanRef || cleanRef.length < 6) {
       setFeedback({
         type: 'error',
-        message: depositMethod === 'UPI'
-          ? 'Please enter a valid 12-digit UTR / Reference ID from GPay / PhonePe / Paytm'
-          : 'Please enter a valid Transaction TXID / Hash',
+        message: 'Please enter a valid 12-digit UTR / Reference ID from GPay / PhonePe / Paytm',
       });
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await submitDepositUTR(numAmount, cleanRef, depositMethod === 'UPI' ? 'UPI_QR' : 'CRYPTO_USDT');
+      const res = await submitDepositUTR(numAmount, cleanRef, 'UPI_QR');
       if (res.success) {
         setFeedback({
           type: 'success',
           message: `Deposit request of ₹${numAmount} submitted! (Ref: ${cleanRef}). Auto-verification in progress.`,
         });
         setUtr('');
-        setCryptoTxid('');
         loadHistory();
         setTimeout(() => setActiveTab('STATUS'), 1800);
       }
@@ -347,180 +334,122 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
         <div className="overflow-y-auto pr-1 flex-1 space-y-3">
 
           {/* =================================================================== */}
-          {/* TAB 1: DEPOSIT MONEY */}
+          {/* TAB 1: INSTANT UPI DEPOSIT */}
           {/* =================================================================== */}
           {activeTab === 'DEPOSIT' && (
             <form onSubmit={handleDepositSubmit} className="space-y-3">
               
-              {/* Payment Method Switcher */}
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setDepositMethod('UPI')}
-                  className={`py-2 px-2 rounded-lg font-black text-xs flex items-center justify-center space-x-1.5 transition-all ${
-                    depositMethod === 'UPI'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white bg-slate-950/60'
-                  }`}
-                >
-                  <span>⚡ Instant UPI</span>
-                </button>
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                
+                {/* QR + UPI Info Compact Grid */}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  {/* Compact QR Image */}
+                  {config?.isQrEnabled !== false && (
+                    <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl bg-white p-1 shadow-md flex-shrink-0 flex items-center justify-center">
+                      <img
+                        src={config?.qrCodeUrl || '/images/payment_qr.svg'}
+                        alt="Baazi Board UPI QR"
+                        className="w-full h-full object-contain rounded-lg"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                            config?.upiId || 'baaziboard@paytm'
+                          )}`;
+                        }}
+                      />
+                    </div>
+                  )}
 
-                <button
-                  type="button"
-                  onClick={() => setDepositMethod('CRYPTO')}
-                  className={`py-2 px-2 rounded-lg font-black text-xs flex items-center justify-center space-x-1.5 transition-all ${
-                    depositMethod === 'CRYPTO'
-                      ? 'bg-amber-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white bg-slate-950/60'
-                  }`}
-                >
-                  <Coins className="w-3.5 h-3.5 text-amber-300" />
-                  <span>🪙 USDT Crypto</span>
-                </button>
-              </div>
-
-              {/* METHOD 1: INSTANT UPI QR & APPS */}
-              {depositMethod === 'UPI' && (
-                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
-                  
-                  {/* QR + UPI Info Compact Grid */}
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    {/* Compact QR Image */}
-                    {config?.isQrEnabled !== false && (
-                      <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl bg-white p-1 shadow-md flex-shrink-0 flex items-center justify-center">
-                        <img
-                          src={config?.qrCodeUrl || '/images/payment_qr.svg'}
-                          alt="Baazi Board UPI QR"
-                          className="w-full h-full object-contain rounded-lg"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                              config?.upiId || 'baaziboard@paytm'
-                            )}`;
-                          }}
-                        />
+                  {/* Copy UPI Details */}
+                  <div className="flex-1 w-full space-y-2 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-400 font-bold block mb-0.5">Official UPI ID:</span>
+                      <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
+                        <span className="font-extrabold text-emerald-400 text-xs truncate">{config?.upiId || 'baaziboard@paytm'}</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyUpi}
+                          className="ml-2 px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all flex items-center space-x-1 flex-shrink-0"
+                        >
+                          {copiedUpi ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+                        </button>
                       </div>
-                    )}
+                    </div>
 
-                    {/* Copy UPI Details */}
-                    <div className="flex-1 w-full space-y-2 text-xs">
+                    {config?.isBankEnabled && config?.accountNumber && (
                       <div>
-                        <span className="text-[11px] text-slate-400 font-bold block mb-0.5">Official UPI ID:</span>
-                        <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-                          <span className="font-extrabold text-emerald-400 text-xs truncate">{config?.upiId || 'baaziboard@paytm'}</span>
+                        <span className="text-[11px] text-slate-400 font-bold block mb-0.5">Direct Bank A/C:</span>
+                        <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 text-[11px]">
+                          <span className="truncate font-semibold text-slate-300">
+                            {config?.bankName} &bull; {config?.accountNumber}
+                          </span>
                           <button
                             type="button"
-                            onClick={handleCopyUpi}
-                            className="ml-2 px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all flex items-center space-x-1 flex-shrink-0"
+                            onClick={handleCopyBank}
+                            className="ml-2 p-1 text-slate-400 hover:text-white"
                           >
-                            {copiedUpi ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+                            {copiedBank ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </div>
-
-                      {config?.isBankEnabled && config?.accountNumber && (
-                        <div>
-                          <span className="text-[11px] text-slate-400 font-bold block mb-0.5">Direct Bank A/C:</span>
-                          <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 text-[11px]">
-                            <span className="truncate font-semibold text-slate-300">
-                              {config?.bankName} &bull; {config?.accountNumber}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleCopyBank}
-                              className="ml-2 p-1 text-slate-400 hover:text-white"
-                            >
-                              {copiedBank ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-
-                  {/* OFFICIAL VECTOR SVG BRAND LOGOS DEEP LINK BUTTONS */}
-                  <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-extrabold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
-                        <Zap className="w-3.5 h-3.5 text-amber-400" />
-                        <span>One-Tap Direct App Launcher:</span>
-                      </span>
-                      <span className="font-black text-emerald-400">Auto ₹{amount || 500}</span>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {/* PhonePe */}
-                      <a
-                        href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
-                        onClick={(e) => handleOpenUPIApp(e, 'PhonePe')}
-                        className="p-2 rounded-xl bg-[#5F259F]/20 hover:bg-[#5F259F]/40 border border-[#5F259F]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
-                      >
-                        <PhonePeLogo />
-                        <span className="font-bold">PhonePe</span>
-                      </a>
-
-                      {/* Google Pay */}
-                      <a
-                        href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
-                        onClick={(e) => handleOpenUPIApp(e, 'Google Pay')}
-                        className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
-                      >
-                        <GPayLogo />
-                        <span className="font-bold">GPay</span>
-                      </a>
-
-                      {/* Paytm */}
-                      <a
-                        href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
-                        onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
-                        className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
-                      >
-                        <PaytmLogo />
-                        <span className="font-bold">Paytm</span>
-                      </a>
-
-                      {/* BHIM */}
-                      <a
-                        href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
-                        onClick={(e) => handleOpenUPIApp(e, 'BHIM / UPI')}
-                        className="p-2 rounded-xl bg-[#008853]/20 hover:bg-[#008853]/40 border border-[#008853]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
-                      >
-                        <BhimLogo />
-                        <span className="font-bold">BHIM</span>
-                      </a>
-                    </div>
-                  </div>
-
                 </div>
-              )}
 
-              {/* METHOD 2: USDT CRYPTO */}
-              {depositMethod === 'CRYPTO' && (
-                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-extrabold text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
-                      <Coins className="w-4 h-4 text-amber-400" />
-                      <span>USDT TRC-20 Address</span>
+                {/* OFFICIAL VECTOR SVG BRAND LOGOS DEEP LINK BUTTONS */}
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-extrabold text-slate-300 uppercase tracking-wider flex items-center space-x-1">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>One-Tap Direct App Launcher:</span>
                     </span>
-                    <span className="text-[10px] font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                      Binance / CoinDCX
-                    </span>
+                    <span className="font-black text-emerald-400">Auto ₹{amount || 500}</span>
                   </div>
 
-                  <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
-                    <span className="font-mono font-bold text-amber-400 truncate">{DEFAULT_USDT_ADDRESS}</span>
-                    <button
-                      type="button"
-                      onClick={handleCopyCrypto}
-                      className="ml-2 px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-all flex items-center space-x-1 flex-shrink-0"
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {/* PhonePe */}
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      onClick={(e) => handleOpenUPIApp(e, 'PhonePe')}
+                      className="p-2 rounded-xl bg-[#5F259F]/20 hover:bg-[#5F259F]/40 border border-[#5F259F]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      {copiedCrypto ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedCrypto ? 'Copied' : 'Copy'}</span>
-                    </button>
+                      <PhonePeLogo />
+                      <span className="font-bold">PhonePe</span>
+                    </a>
+
+                    {/* Google Pay */}
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      onClick={(e) => handleOpenUPIApp(e, 'Google Pay')}
+                      className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
+                    >
+                      <GPayLogo />
+                      <span className="font-bold">GPay</span>
+                    </a>
+
+                    {/* Paytm */}
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
+                      className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
+                    >
+                      <PaytmLogo />
+                      <span className="font-bold">Paytm</span>
+                    </a>
+
+                    {/* BHIM */}
+                    <a
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      onClick={(e) => handleOpenUPIApp(e, 'BHIM / UPI')}
+                      className="p-2 rounded-xl bg-[#008853]/20 hover:bg-[#008853]/40 border border-[#008853]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
+                    >
+                      <BhimLogo />
+                      <span className="font-bold">BHIM</span>
+                    </a>
                   </div>
                 </div>
-              )}
+
+              </div>
 
               {/* Deposit Amount Selector */}
               <div className="space-y-1.5">
@@ -557,18 +486,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
               {/* UTR / Ref Input */}
               <div className="space-y-1">
                 <label className="block text-xs font-black text-slate-300 uppercase tracking-wider">
-                  {depositMethod === 'UPI' ? '12-Digit UTR / Ref ID' : 'USDT Transaction Hash / TXID'}
+                  12-Digit UTR / Ref ID
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={
-                    depositMethod === 'UPI'
-                      ? 'e.g. 420918239012 (from PhonePe/Paytm/GPay receipt)'
-                      : 'e.g. 8f92a10b... (Binance TXID)'
-                  }
-                  value={depositMethod === 'UPI' ? utr : cryptoTxid}
-                  onChange={(e) => depositMethod === 'UPI' ? setUtr(e.target.value.toUpperCase()) : setCryptoTxid(e.target.value)}
+                  placeholder="e.g. 420918239012 (from PhonePe/Paytm/GPay receipt)"
+                  value={utr}
+                  onChange={(e) => setUtr(e.target.value.toUpperCase())}
                   className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-emerald-400 font-mono font-bold text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none tracking-wider placeholder:font-sans placeholder:text-slate-500"
                 />
               </div>
