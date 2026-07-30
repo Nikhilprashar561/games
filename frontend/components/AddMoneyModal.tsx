@@ -12,38 +12,6 @@ interface AddMoneyModalProps {
   initialTab?: 'DEPOSIT' | 'STATUS' | 'WITHDRAW';
 }
 
-/* ============================================================================
- * OFFICIAL HIGH-DEFINITION VECTOR BRAND LOGOS
- * ==========================================================================*/
-const PhonePeLogo = () => (
-  <svg className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="24" height="24" rx="7" fill="#5F259F" />
-    <path d="M12.5 5.5H8.2v13h2.6v-4.1h1.7c2.6 0 4.7-1.9 4.7-4.4 0-2.6-2.1-4.5-4.7-4.5zm0 6.2h-1.7V8h1.7c1.3 0 2.2.9 2.2 1.8.1 1.1-.8 1.9-2.2 1.9z" fill="#FFFFFF" />
-  </svg>
-);
-
-const GPayLogo = () => (
-  <svg className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="24" height="24" rx="7" fill="#FFFFFF" />
-    <path d="M11.64 12.22v2.53h4.03c-.16 1.05-1.22 3.08-4.03 3.08-2.43 0-4.41-2.01-4.41-4.49s1.98-4.49 4.41-4.49c1.38 0 2.31.59 2.84 1.1l1.98-1.92C15.2 6.84 13.59 6 11.64 6 8.01 6 5.07 8.94 5.07 12.57s2.94 6.57 6.57 6.57c3.79 0 6.31-2.67 6.31-6.42 0-.45-.05-.8-.11-1.14h-6.2v.64z" fill="#4285F4" />
-  </svg>
-);
-
-const PaytmLogo = () => (
-  <svg className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="24" height="24" rx="7" fill="#002E6E" />
-    <path d="M4.5 7h4v2.5h-4zM6 9.5h1V17H6zM10.5 7h4.5v2.5h-4zM11.5 9.5h2.5v7.5h-2.5z" fill="#00BAF2" />
-  </svg>
-);
-
-const BhimLogo = () => (
-  <svg className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="24" height="24" rx="7" fill="#008853" />
-    <path d="M7 6l10 6-10 6V6z" fill="#FF9933" />
-    <path d="M11 9.5l4.5 2.5-4.5 2.5V9.5z" fill="#FFFFFF" />
-  </svg>
-);
-
 export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, initialTab = 'DEPOSIT' }) => {
   const {
     user,
@@ -413,7 +381,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'PhonePe')}
                       className="p-2 rounded-xl bg-[#5F259F]/20 hover:bg-[#5F259F]/40 border border-[#5F259F]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <PhonePeLogo />
+                      <img src="/images/phonepe.svg" alt="PhonePe" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">PhonePe</span>
                     </a>
 
@@ -423,7 +391,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'Google Pay')}
                       className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <GPayLogo />
+                      <img src="/images/gpay.svg" alt="Google Pay" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">GPay</span>
                     </a>
 
@@ -433,7 +401,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
                       className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <PaytmLogo />
+                      <img src="/images/paytm.svg" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">Paytm</span>
                     </a>
 
@@ -443,7 +411,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'BHIM / UPI')}
                       className="p-2 rounded-xl bg-[#008853]/20 hover:bg-[#008853]/40 border border-[#008853]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <BhimLogo />
+                      <img src="/images/bhim.svg" alt="BHIM" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">BHIM</span>
                     </a>
                   </div>
