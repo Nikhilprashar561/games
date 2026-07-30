@@ -201,7 +201,7 @@ export const AuthModal: React.FC = () => {
                 <input
                   type="email"
                   required
-                  placeholder="e.g., nikhil@gmail.com"
+                  placeholder="e.g., yours@gmail.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
