@@ -51,7 +51,7 @@ export default function ProfilePage() {
     const loadData = async () => {
       setLoading(true);
       const slugArg = selectedGameSlug === 'all' ? undefined : selectedGameSlug;
-      const data = await fetchMatchHistory(slugArg);
+      const data = await fetchMatchHistory(slugArg, 'REAL');
       setStats(data.stats);
       setLogs(data.logs);
       setLoading(false);
@@ -455,50 +455,66 @@ export default function ProfilePage() {
                   <thead className="bg-slate-900 text-slate-400 font-extrabold uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="py-3.5 px-4">Game</th>
+                      <th className="py-3.5 px-4">Mode</th>
                       <th className="py-3.5 px-4">Opponent</th>
                       <th className="py-3.5 px-4">Result</th>
                       <th className="py-3.5 px-4">Stake</th>
                       <th className="py-3.5 px-4">Won</th>
-                      <th className="py-3.5 px-4">Net Money</th>
+                      <th className="py-3.5 px-4">Net</th>
                       <th className="py-3.5 px-4">Date & Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-semibold">
-                    {logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">
-                          {log.gameTitle}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
-                          {log.opponentName}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase ${
-                            log.result === 'WIN'
-                              ? 'bg-emerald-500/20 text-emerald-500'
-                              : log.result === 'LOSS'
-                              ? 'bg-rose-500/20 text-rose-500'
-                              : 'bg-slate-500/20 text-slate-400'
+                    {logs.map((log: any) => {
+                      const isRealMode = (log.playMode || 'REAL') === 'REAL';
+                      const stakeVal = log.entryFee !== undefined ? log.entryFee : log.amountSpent || 0;
+                      const netVal = log.netAmount !== undefined ? log.netAmount : (log.amountWon || 0) - stakeVal;
+
+                      return (
+                        <tr key={log._id || log.id} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">
+                            {log.gameTitle || log.gameSlug}
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              isRealMode ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            }`}>
+                              {log.playMode || 'REAL'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
+                            {log.opponentName || 'Online Player'}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase ${
+                              log.result === 'WIN'
+                                ? 'bg-emerald-500/20 text-emerald-500'
+                                : log.result === 'LOSS'
+                                ? 'bg-rose-500/20 text-rose-500'
+                                : 'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {log.result}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400 whitespace-nowrap font-bold">
+                            {isRealMode ? `₹${formatCurrency(stakeVal)}` : `🪙 ${formatCoins(stakeVal)}`}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-amber-400 whitespace-nowrap">
+                            {isRealMode ? `+₹${formatCurrency(log.amountWon || 0)}` : `+🪙 ${formatCoins(log.amountWon || 0)}`}
+                          </td>
+                          <td className={`py-3.5 px-4 font-black whitespace-nowrap ${
+                            netVal >= 0 ? 'text-emerald-500' : 'text-rose-500'
                           }`}>
-                            {log.result}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                          ₹{formatCurrency(log.amountSpent)}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-amber-500 whitespace-nowrap">
-                          +₹{formatCurrency(log.amountWon)}
-                        </td>
-                        <td className={`py-3.5 px-4 font-black whitespace-nowrap ${
-                          log.netAmount >= 0 ? 'text-emerald-500' : 'text-rose-500'
-                        }`}>
-                          {log.netAmount >= 0 ? `+₹${formatCurrency(log.netAmount)}` : `₹${formatCurrency(log.netAmount)}`}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">
-                          {new Date(log.playedAt).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
+                            {isRealMode
+                              ? (netVal >= 0 ? `+₹${formatCurrency(netVal)}` : `-₹${formatCurrency(Math.abs(netVal))}`)
+                              : (netVal >= 0 ? `+🪙 ${formatCoins(netVal)}` : `-🪙 ${formatCoins(Math.abs(netVal))}`)}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">
+                            {new Date(log.playedAt || Date.now()).toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -36,7 +36,7 @@ interface AuthContextType {
     amountWon: number,
     opponentName?: string
   ) => Promise<void>;
-  fetchMatchHistory: (gameSlug?: string) => Promise<{ stats: GameStats; logs: GameMatchLog[] }>;
+  fetchMatchHistory: (gameSlug?: string, mode?: 'REAL' | 'DEMO') => Promise<{ stats: GameStats; logs: GameMatchLog[] }>;
   openRazorpayCheckout: (amount: number) => void;
 
   // UTR & Deposit API
@@ -372,10 +372,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const fetchMatchHistory = async (gameSlug?: string): Promise<{ stats: GameStats; logs: GameMatchLog[] }> => {
+  const fetchMatchHistory = async (gameSlug?: string, mode: 'REAL' | 'DEMO' = 'REAL'): Promise<{ stats: GameStats; logs: GameMatchLog[] }> => {
     if (token) {
       try {
-        const url = gameSlug ? `/api/games/history?gameSlug=${gameSlug}` : '/api/games/history';
+        let url = `/api/games/history?playMode=${mode}`;
+        if (gameSlug) url += `&gameSlug=${encodeURIComponent(gameSlug)}`;
         const res = await axios.get(url);
         if (res.data.success) {
           return { stats: res.data.stats, logs: res.data.logs };

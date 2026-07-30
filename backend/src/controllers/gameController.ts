@@ -24,19 +24,33 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
 
     const totalPot = 2 * fee;
 
-    if (result === 'WIN') {
-      // 12% cut of the winning pot to admin, 88% to winner
-      adminCommission = Math.round(totalPot * 0.12 * 100) / 100;
-      amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round((totalPot - adminCommission) * 100) / 100;
-      balanceDelta = amountWon - fee; // Net profit
-    } else if (result === 'LOSS') {
-      amountWon = 0;
-      adminCommission = fee; // Whole bet amount goes to admin
-      balanceDelta = -fee; // Net loss
-    } else if (result === 'DRAW') {
-      amountWon = fee; // Entry fee refunded
+    if (mode === 'DEMO') {
       adminCommission = 0;
-      balanceDelta = 0; // Net zero
+      if (result === 'WIN') {
+        amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round(fee * 1.8);
+        balanceDelta = amountWon - fee;
+      } else if (result === 'LOSS') {
+        amountWon = 0;
+        balanceDelta = -fee;
+      } else {
+        amountWon = fee;
+        balanceDelta = 0;
+      }
+    } else {
+      if (result === 'WIN') {
+        // 12% cut of the winning pot to admin, 88% to winner
+        adminCommission = Math.round(totalPot * 0.12 * 100) / 100;
+        amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round((totalPot - adminCommission) * 100) / 100;
+        balanceDelta = amountWon - fee; // Net profit
+      } else if (result === 'LOSS') {
+        amountWon = 0;
+        adminCommission = fee; // Whole bet amount goes to admin
+        balanceDelta = -fee; // Net loss
+      } else if (result === 'DRAW') {
+        amountWon = fee; // Entry fee refunded
+        adminCommission = 0;
+        balanceDelta = 0; // Net zero
+      }
     }
 
     const netAmount = Math.round((amountWon - fee) * 100) / 100;
@@ -131,7 +145,8 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, message: 'Not authorized' });
     }
 
-    const { gameSlug } = req.query;
+    const { gameSlug, mode, playMode: playModeQuery } = req.query;
+    const targetMode = (mode || playModeQuery || 'REAL') as string;
 
     try {
       const query: any = { userId: req.user.id };
@@ -140,13 +155,16 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
       }
 
       const logs = await GameLog.find(query).sort({ playedAt: -1 }).limit(50);
-      
-      const totalMatches = logs.length;
-      const wins = logs.filter((l) => l.result === 'WIN').length;
-      const losses = logs.filter((l) => l.result === 'LOSS').length;
-      const draws = logs.filter((l) => l.result === 'DRAW').length;
-      const totalWon = Math.round(logs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
-      const totalSpent = Math.round(logs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
+
+      // Filter logs for stats calculation based on playMode (defaults to REAL mode for Real Money Dashboard)
+      const realLogs = logs.filter((l) => l.playMode === targetMode || (targetMode === 'REAL' && (!l.playMode || l.playMode === 'REAL')));
+
+      const totalMatches = realLogs.length;
+      const wins = realLogs.filter((l) => l.result === 'WIN').length;
+      const losses = realLogs.filter((l) => l.result === 'LOSS').length;
+      const draws = realLogs.filter((l) => l.result === 'DRAW').length;
+      const totalWon = Math.round(realLogs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
+      const totalSpent = Math.round(realLogs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
       const netEarnings = Math.round((totalWon - totalSpent) * 100) / 100;
 
@@ -168,13 +186,14 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
       const userLogs = fallbackLogs.filter(
         (l) => l.userId === req.user?.id && (!gameSlug || l.gameSlug === gameSlug)
       );
+      const realLogs = userLogs.filter((l) => l.playMode === targetMode || (targetMode === 'REAL' && (!l.playMode || l.playMode === 'REAL')));
 
-      const totalMatches = userLogs.length;
-      const wins = userLogs.filter((l) => l.result === 'WIN').length;
-      const losses = userLogs.filter((l) => l.result === 'LOSS').length;
-      const draws = userLogs.filter((l) => l.result === 'DRAW').length;
-      const totalWon = Math.round(userLogs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
-      const totalSpent = Math.round(userLogs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
+      const totalMatches = realLogs.length;
+      const wins = realLogs.filter((l) => l.result === 'WIN').length;
+      const losses = realLogs.filter((l) => l.result === 'LOSS').length;
+      const draws = realLogs.filter((l) => l.result === 'DRAW').length;
+      const totalWon = Math.round(realLogs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
+      const totalSpent = Math.round(realLogs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
       const netEarnings = Math.round((totalWon - totalSpent) * 100) / 100;
 
@@ -204,7 +223,7 @@ export const getAllGameLogs = async (req: AuthRequest, res: Response) => {
   try {
     try {
       const logs = await GameLog.find({}).sort({ playedAt: -1 }).limit(100);
-      const rawCommission = logs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const rawCommission = logs.filter((l) => l.playMode === 'REAL').reduce((sum, l) => sum + (l.adminCommission || 0), 0);
       const totalAdminCommission = Math.round(rawCommission * 100) / 100;
 
       return res.json({
@@ -213,7 +232,7 @@ export const getAllGameLogs = async (req: AuthRequest, res: Response) => {
         logs,
       });
     } catch (dbErr) {
-      const rawCommission = fallbackLogs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const rawCommission = fallbackLogs.filter((l) => l.playMode === 'REAL').reduce((sum, l) => sum + (l.adminCommission || 0), 0);
       const totalAdminCommission = Math.round(rawCommission * 100) / 100;
       return res.json({
         success: true,
