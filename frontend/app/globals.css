@@ -33,3 +33,19 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-700;
 }
+
+/* Toast Animations */
+@keyframes slideUpToast {
+  0% {
+    transform: translateY(100%) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpToast 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

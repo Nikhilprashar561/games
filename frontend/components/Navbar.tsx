@@ -91,7 +91,7 @@ export const Navbar: React.FC = () => {
     <>
       {/* Floating Welcome Back Banner Toast */}
       {welcomeToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 sm:px-6 sm:py-3 rounded-2xl bg-slate-900 text-white font-extrabold text-xs sm:text-sm shadow-2xl border-2 border-emerald-500 animate-bounce flex items-center space-x-2">
+        <div className="fixed bottom-6 left-6 z-[9999] px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl bg-[#0a0f1d]/95 backdrop-blur-2xl text-white font-extrabold text-xs sm:text-sm shadow-2xl border border-emerald-500/60 animate-slide-up flex items-center space-x-2">
           <span>{welcomeToast}</span>
         </div>
       )}
