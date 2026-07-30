@@ -408,7 +408,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
                       className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
-                      <img src="/images/paytm.png" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
+                      <img src="/images/paytm.jpeg" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
                       <span className="font-bold">Paytm</span>
                     </a>
 
