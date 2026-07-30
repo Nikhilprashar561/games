@@ -1,27 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RotateCcw, User, Trophy, Sparkles, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, RotateCcw, User, Trophy, Sparkles, Clock, Coins, Play, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getRandomOpponentName } from '../../../utils/realPlayers';
-
 import { useAuth } from '../../../context/AuthContext';
+import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 
 type BoardState = Array<string | null>;
 
-import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
-
 export default function TicTacToePage() {
-  const { user, recordGameMatch, openAuthModal, playMode, setPlayMode } = useAuth();
+  const router = useRouter();
+  const { user, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode } = useAuth();
+  
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
 
   // Enforce Demo Mode for Tic-Tac-Toe
-  React.useEffect(() => {
+  useEffect(() => {
     setPlayMode('DEMO');
   }, []);
 
+  const [gameState, setGameState] = useState<'CONFIRM' | 'PLAYING' | 'ENDED'>('CONFIRM');
   const [board, setBoard] = useState<BoardState>(Array(9).fill(null));
   const [isXNext, setIsXNext] = useState<boolean>(true);
   const [opponentName, setOpponentName] = useState<string>('Rohan_Gamer');
@@ -111,27 +113,43 @@ export default function TicTacToePage() {
       const winCheck = calculateWinner(newBoard);
       if (winCheck?.winner === 'O') {
         setScores((prev) => ({ ...prev, o: prev.o + 1 }));
+        setGameState('ENDED');
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'LOSS', ENTRY_COST, 0, opponentName);
       } else if (winCheck?.winner === 'Draw') {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
+        setGameState('ENDED');
+        // Refund entry fee on draw
+        updateDemoBalance(ENTRY_COST);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
-    }, 1500); // 1.5s Realistic Human Strategic Thinking Latency
+    }, 1200); // 1.2s Human AI response latency
   };
 
-  const handleClick = (index: number) => {
-    if (board[index] || result || isOpponentThinking || !isXNext) return;
-
+  // Immediate Upfront Entry Fee Deduction & Start Match
+  const startMatch = () => {
     if (!user) {
       openAuthModal();
       return;
     }
 
-    const currentBalance = playMode === 'REAL' ? (user?.walletBalance || 0) : (user?.demoBalance !== undefined ? user.demoBalance : 1000);
-    if (currentBalance < ENTRY_COST) {
-      alert(`Insufficient balance to play! Your current ${playMode === 'REAL' ? 'Real Money balance is ₹' + formatCurrency(user?.walletBalance) : 'Demo Coins balance is 🪙 ' + formatCoins(user?.demoBalance)}. Entry fee is ${playMode === 'REAL' ? '₹' + ENTRY_COST : ENTRY_COST + ' Demo Coins'}. Please switch mode or deposit cash.`);
+    const currentDemoCoins = user?.demoBalance !== undefined ? user.demoBalance : 1000;
+    if (currentDemoCoins < ENTRY_COST) {
+      alert(`Insufficient Demo Coins balance! You need 🪙 ${ENTRY_COST} Demo Coins to enter. Your balance is 🪙 ${formatCoins(currentDemoCoins)}.`);
       return;
     }
+
+    // DEDUCT ENTRY FEE IMMEDIATELY BEFORE GAME STARTS
+    updateDemoBalance(-ENTRY_COST);
+
+    setBoard(Array(9).fill(null));
+    setIsXNext(true);
+    setIsOpponentThinking(false);
+    setOpponentName(getRandomOpponentName());
+    setGameState('PLAYING');
+  };
+
+  const handleClick = (index: number) => {
+    if (board[index] || result || isOpponentThinking || !isXNext || gameState !== 'PLAYING') return;
 
     const newBoard = [...board];
     newBoard[index] = 'X';
@@ -140,8 +158,11 @@ export default function TicTacToePage() {
     const winCheck = calculateWinner(newBoard);
 
     if (winCheck?.winner) {
+      setGameState('ENDED');
       if (winCheck.winner === 'X') {
         setScores((prev) => ({ ...prev, x: prev.x + 1 }));
+        // Credit win reward
+        updateDemoBalance(WIN_REWARD);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
         confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
       } else if (winCheck.winner === 'O') {
@@ -149,19 +170,14 @@ export default function TicTacToePage() {
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'LOSS', ENTRY_COST, 0, opponentName);
       } else {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
+        // Refund entry fee on draw
+        updateDemoBalance(ENTRY_COST);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
     } else {
       setIsXNext(false);
       makeOpponentMove(newBoard);
     }
-  };
-
-  const resetGame = () => {
-    setBoard(Array(9).fill(null));
-    setIsXNext(true);
-    setIsOpponentThinking(false);
-    setOpponentName(getRandomOpponentName());
   };
 
   const getLineClass = (line: number[]) => {
@@ -182,115 +198,173 @@ export default function TicTacToePage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Single-Tab Back Navigation */}
       <Link
-        href="/"
-        className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-500 hover:text-emerald-500 transition-colors mb-6"
+        href="/#games-section"
+        onClick={(e) => {
+          e.preventDefault();
+          router.push('/#games-section');
+        }}
+        className="inline-flex items-center space-x-2 text-sm font-semibold text-slate-400 hover:text-emerald-400 transition-colors mb-6 cursor-pointer"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to All Games</span>
       </Link>
 
-      <div className="rounded-3xl p-6 sm:p-8 border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white shadow-2xl transition-colors duration-300">
+      <div className="rounded-3xl p-6 sm:p-8 border-2 border-slate-800 bg-[#0a0f1d] text-white shadow-2xl transition-colors duration-300">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-black/20 dark:border-white/20">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-800">
           <div>
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black text-white dark:bg-white dark:text-black text-xs font-bold uppercase mb-1">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase mb-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Public Arena</span>
+              <span>Demo Coins Arena</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Space_Grotesk']">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Space_Grotesk'] text-white">
               Tic Tac Toe Pro
             </h1>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-full bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
-            <User className="w-4 h-4" />
+          <div className="flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
+            <User className="w-4 h-4 text-emerald-400" />
             <span>Matched: {opponentName}</span>
           </div>
         </div>
 
-        {/* Demo Mode Only Notice */}
-        <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-extrabold text-xs flex items-center space-x-2">
+        {/* Demo Mode Notice */}
+        <div className="mb-6 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-extrabold text-xs flex items-center space-x-2">
           <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span>🎮 Tic Tac Toe is available exclusively in Demo Practice Mode (Demo Coins). Real Cash mode is disabled for this game.</span>
+          <span>🎮 Tic Tac Toe is available exclusively in Demo Mode (Demo Coins). Real Cash mode is disabled for this game.</span>
         </div>
 
-        {/* Score Board */}
-        <div className="grid grid-cols-3 gap-3 mb-6 max-w-sm mx-auto text-center font-['Space_Grotesk']">
-          <div className="p-3 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
-            <p className="text-[11px] font-black uppercase">You (X)</p>
-            <p className="text-xl font-black">{scores.x}</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
-            <p className="text-[11px] font-black uppercase">Draws</p>
-            <p className="text-xl font-black">{scores.draws}</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
-            <p className="text-[11px] font-black uppercase">{opponentName} (O)</p>
-            <p className="text-xl font-black">{scores.o}</p>
-          </div>
-        </div>
-
-        {/* Turn State Banner */}
-        <div className="text-center mb-6 h-10 flex items-center justify-center">
-          {result ? (
-            <div className="inline-flex items-center space-x-2 px-6 py-2 rounded-2xl bg-black text-white dark:bg-white dark:text-black font-black text-base shadow-xl animate-bounce border border-black dark:border-white">
-              <Trophy className="w-4 h-4" />
-              <span>{result.winner === 'Draw' ? "It's a Draw!" : result.winner === 'X' ? 'You Won! 🎉' : `${opponentName} Won!`}</span>
+        {/* ========================================================================= */}
+        {/* PRE-GAME ENTRY FEE CONFIRMATION POPUP / CARD */}
+        {/* ========================================================================= */}
+        {gameState === 'CONFIRM' && (
+          <div className="p-6 sm:p-8 rounded-2xl bg-slate-900/90 border border-slate-800 text-center space-y-5 my-4 animate-fade-in shadow-2xl max-w-md mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-md">
+              <Coins className="w-8 h-8" />
             </div>
-          ) : isOpponentThinking ? (
-            <div className="inline-flex items-center space-x-2 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
-              <Clock className="w-3.5 h-3.5 animate-spin" />
-              <span>{opponentName} is evaluating strategy...</span>
+
+            <div>
+              <h2 className="text-xl font-black text-white font-['Space_Grotesk']">
+                Match Entry Fee Confirmation
+              </h2>
+              <p className="text-xs text-slate-400 mt-1 font-semibold">
+                Match opponent: <span className="text-emerald-400 font-bold">{opponentName}</span>
+              </p>
             </div>
-          ) : (
-            <p className="text-xs font-bold uppercase tracking-wider">
-              Turn: <span className="underline font-black">{isXNext ? 'Your Turn (X)' : `${opponentName}'s Turn`}</span>
-            </p>
-          )}
-        </div>
 
-        {/* 3x3 Grid */}
-        <div className="relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] mx-auto aspect-square mb-6">
-          <div className="w-full h-full grid grid-cols-3 gap-2.5">
-            {board.map((cell, idx) => {
-              const isWinningCell = result?.line.includes(idx);
-              return (
-                <button
-                  key={idx}
-                  disabled={isOpponentThinking || !!cell || !!result}
-                  onClick={() => handleClick(idx)}
-                  className={`rounded-2xl text-2xl sm:text-4xl font-black flex items-center justify-center transition-all duration-200 select-none shadow-md ${
-                    cell === null
-                      ? 'bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 border-2 border-black/20 dark:border-white/20'
-                      : 'bg-black text-white dark:bg-white dark:text-black border-2 border-black dark:border-white'
-                  } ${isWinningCell ? 'scale-105 ring-4 ring-emerald-500' : ''}`}
-                >
-                  {cell}
-                </button>
-              );
-            })}
+            <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              <div className="space-y-0.5">
+                <span className="text-slate-400 font-bold text-[11px] uppercase block">Entry Fee</span>
+                <span className="text-base font-black text-amber-400">🪙 {ENTRY_COST} Demo</span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-slate-400 font-bold text-[11px] uppercase block">Win Prize</span>
+                <span className="text-base font-black text-emerald-400">🪙 {WIN_REWARD} Demo</span>
+              </div>
+            </div>
+
+            {/* Upfront Warning Notice */}
+            <div className="p-3 rounded-xl bg-slate-950 border border-amber-500/30 text-left flex items-start space-x-2 text-[11px] text-amber-300 font-bold">
+              <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <span>Notice: 🪙 10 Demo Coins will be deducted immediately from your balance as soon as you start this match.</span>
+            </div>
+
+            <button
+              onClick={startMatch}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center space-x-2"
+            >
+              <Play className="w-4 h-4 fill-slate-950" />
+              <span>Deduct 10 Coins & Start Match 🎮</span>
+            </button>
           </div>
+        )}
 
-          {result?.line && result.line.length === 3 && (
-            <div
-              className={`absolute bg-emerald-500 shadow-[0_0_15px_#10b981] rounded-full transition-all duration-700 ease-out animate-pulse z-20 pointer-events-none ${getLineClass(
-                result.line
-              )}`}
-            />
-          )}
-        </div>
+        {/* ========================================================================= */}
+        {/* GAMEPLAY BOARD */}
+        {/* ========================================================================= */}
+        {gameState !== 'CONFIRM' && (
+          <>
+            {/* Score Board */}
+            <div className="grid grid-cols-3 gap-3 mb-6 max-w-sm mx-auto text-center font-['Space_Grotesk']">
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[11px] font-black uppercase text-slate-400">You (X)</p>
+                <p className="text-xl font-black text-emerald-400">{scores.x}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[11px] font-black uppercase text-slate-400">Draws</p>
+                <p className="text-xl font-black text-slate-300">{scores.draws}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
+                <p className="text-[11px] font-black uppercase text-slate-400">{opponentName} (O)</p>
+                <p className="text-xl font-black text-rose-400">{scores.o}</p>
+              </div>
+            </div>
 
-        <div className="flex justify-center">
-          <button
-            onClick={resetGame}
-            className="px-6 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-black text-xs border-2 border-black dark:border-white hover:opacity-90 transition-all flex items-center space-x-2 shadow-md"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Board</span>
-          </button>
-        </div>
+            {/* Turn State Banner */}
+            <div className="text-center mb-6 h-10 flex items-center justify-center">
+              {result ? (
+                <div className="inline-flex items-center space-x-2 px-6 py-2 rounded-2xl bg-emerald-600 text-white font-black text-base shadow-xl animate-bounce border border-emerald-400">
+                  <Trophy className="w-4 h-4" />
+                  <span>{result.winner === 'Draw' ? "It's a Draw! (10 Coins Refunded)" : result.winner === 'X' ? `You Won 🪙 ${WIN_REWARD} Demo Coins! 🎉` : `${opponentName} Won!`}</span>
+                </div>
+              ) : isOpponentThinking ? (
+                <div className="inline-flex items-center space-x-2 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  <span>{opponentName} is evaluating strategy...</span>
+                </div>
+              ) : (
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Turn: <span className="underline font-black text-emerald-400">{isXNext ? 'Your Turn (X)' : `${opponentName}'s Turn`}</span>
+                </p>
+              )}
+            </div>
+
+            {/* 3x3 Grid */}
+            <div className="relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] mx-auto aspect-square mb-6">
+              <div className="w-full h-full grid grid-cols-3 gap-2.5">
+                {board.map((cell, idx) => {
+                  const isWinningCell = result?.line.includes(idx);
+                  return (
+                    <button
+                      key={idx}
+                      disabled={isOpponentThinking || !!cell || !!result}
+                      onClick={() => handleClick(idx)}
+                      className={`rounded-2xl text-2xl sm:text-4xl font-black flex items-center justify-center transition-all duration-200 select-none shadow-md ${
+                        cell === null
+                          ? 'bg-slate-900 hover:bg-slate-800 border-2 border-slate-800'
+                          : 'bg-slate-950 text-white border-2 border-emerald-500/50'
+                      } ${isWinningCell ? 'scale-105 ring-4 ring-emerald-500' : ''}`}
+                    >
+                      {cell}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {result?.line && result.line.length === 3 && (
+                <div
+                  className={`absolute bg-emerald-500 shadow-[0_0_15px_#10b981] rounded-full transition-all duration-700 ease-out animate-pulse z-20 pointer-events-none ${getLineClass(
+                    result.line
+                  )}`}
+                />
+              )}
+            </div>
+
+            {/* Play Again Button */}
+            <div className="flex justify-center">
+              <button
+                onClick={startMatch}
+                className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center space-x-2 shadow-lg shadow-amber-500/20"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Play Again (Deduct 10 Coins) 🎮</span>
+              </button>
+            </div>
+          </>
+        )}
 
       </div>
     </div>
