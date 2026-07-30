@@ -400,18 +400,18 @@ export default function ProfilePage() {
 
             <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center">
               <p className="text-xs font-bold text-amber-500 uppercase">Total Won</p>
-              <p className="text-3xl font-black text-amber-500 mt-1 font-['Space_Grotesk']">
-                +₹{stats.totalWon}
+              <p className="text-2xl sm:text-3xl font-black text-amber-500 mt-1 font-['Space_Grotesk']">
+                +₹{formatCurrency(stats.totalWon)}
               </p>
               <p className="text-[11px] font-semibold text-slate-400 mt-1">Earned Wallet Rewards</p>
             </div>
 
             <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-center">
               <p className="text-xs font-bold text-slate-400 uppercase">Net Earnings</p>
-              <p className={`text-3xl font-black mt-1 font-['Space_Grotesk'] ${
+              <p className={`text-2xl sm:text-3xl font-black mt-1 font-['Space_Grotesk'] ${
                 stats.netEarnings >= 0 ? 'text-emerald-500' : 'text-rose-500'
               }`}>
-                {stats.netEarnings >= 0 ? `+₹${stats.netEarnings}` : `₹${stats.netEarnings}`}
+                {stats.netEarnings >= 0 ? `+₹${formatCurrency(stats.netEarnings)}` : `₹${formatCurrency(stats.netEarnings)}`}
               </p>
               <p className="text-[11px] font-semibold text-slate-400 mt-1">Profit/Loss</p>
             </div>
@@ -451,10 +451,10 @@ export default function ProfilePage() {
                   <tbody className="divide-y divide-slate-800/60 font-semibold">
                     {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-900/50 transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white">
+                        <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">
                           {log.gameTitle}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-300">
+                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
                           {log.opponentName}
                         </td>
                         <td className="py-3.5 px-4">
@@ -468,18 +468,18 @@ export default function ProfilePage() {
                             {log.result}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-500">
-                          ₹{log.amountSpent}
+                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                          ₹{formatCurrency(log.amountSpent)}
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-amber-500">
-                          +₹{log.amountWon}
+                        <td className="py-3.5 px-4 font-bold text-amber-500 whitespace-nowrap">
+                          +₹{formatCurrency(log.amountWon)}
                         </td>
-                        <td className={`py-3.5 px-4 font-black ${
+                        <td className={`py-3.5 px-4 font-black whitespace-nowrap ${
                           log.netAmount >= 0 ? 'text-emerald-500' : 'text-rose-500'
                         }`}>
-                          {log.netAmount >= 0 ? `+₹${log.netAmount}` : `₹${log.netAmount}`}
+                          {log.netAmount >= 0 ? `+₹${formatCurrency(log.netAmount)}` : `₹${formatCurrency(log.netAmount)}`}
                         </td>
-                        <td className="py-3.5 px-4 text-slate-400 text-xs">
+                        <td className="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">
                           {new Date(log.playedAt).toLocaleString()}
                         </td>
                       </tr>

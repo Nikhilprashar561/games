@@ -39,7 +39,7 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
       balanceDelta = 0; // Net zero
     }
 
-    const netAmount = amountWon - fee;
+    const netAmount = Math.round((amountWon - fee) * 100) / 100;
 
     try {
       // Find and update user balance in MongoDB
@@ -145,9 +145,10 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
       const wins = logs.filter((l) => l.result === 'WIN').length;
       const losses = logs.filter((l) => l.result === 'LOSS').length;
       const draws = logs.filter((l) => l.result === 'DRAW').length;
-      const totalWon = logs.reduce((sum, l) => sum + (l.amountWon || 0), 0);
-      const totalSpent = logs.reduce((sum, l) => sum + (l.entryFee || 0), 0);
+      const totalWon = Math.round(logs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
+      const totalSpent = Math.round(logs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+      const netEarnings = Math.round((totalWon - totalSpent) * 100) / 100;
 
       return res.json({
         success: true,
@@ -159,7 +160,7 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
           winRate,
           totalWon,
           totalSpent,
-          netEarnings: totalWon - totalSpent,
+          netEarnings,
         },
         logs,
       });
@@ -172,9 +173,10 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
       const wins = userLogs.filter((l) => l.result === 'WIN').length;
       const losses = userLogs.filter((l) => l.result === 'LOSS').length;
       const draws = userLogs.filter((l) => l.result === 'DRAW').length;
-      const totalWon = userLogs.reduce((sum, l) => sum + (l.amountWon || 0), 0);
-      const totalSpent = userLogs.reduce((sum, l) => sum + (l.entryFee || 0), 0);
+      const totalWon = Math.round(userLogs.reduce((sum, l) => sum + (l.amountWon || 0), 0) * 100) / 100;
+      const totalSpent = Math.round(userLogs.reduce((sum, l) => sum + (l.entryFee || 0), 0) * 100) / 100;
       const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+      const netEarnings = Math.round((totalWon - totalSpent) * 100) / 100;
 
       return res.json({
         success: true,
@@ -186,7 +188,7 @@ export const getGameHistory = async (req: AuthRequest, res: Response) => {
           winRate,
           totalWon,
           totalSpent,
-          netEarnings: totalWon - totalSpent,
+          netEarnings,
         },
         logs: userLogs,
       });
