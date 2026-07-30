@@ -631,38 +631,40 @@ export default function LudoPage() {
     );
   };
 
-// ---------- TEARDROP LOCATION-PIN TOKEN MARKER, grounded to the exact dead-center of its cell ----------
+// ---------- TEARDROP LOCATION-PIN TOKEN MARKER, grounded to the exact center-base of its cell ----------
 const renderPawn = (
   color: PlayerColor,
   isSelectable: boolean = false,
   isTraveling: boolean = false,
-  scaleFactor: 'normal' | 'medium' | 'small' = 'normal'
+  scaleFactor: 'normal' | 'medium' | 'small' = 'normal',
+  isBaseYard: boolean = false
 ) => {
   const { main, border } = PIN_COLOR_HEX[color];
 
-  // Increased marker size for excellent visibility while fitting comfortably inside cells
-  const sizeClasses =
-    scaleFactor === 'small'
-      ? 'w-[15px] h-[19px] sm:w-[18px] sm:h-[23px]'
-      : scaleFactor === 'medium'
-      ? 'w-[20px] h-[25px] sm:w-[24px] sm:h-[30px]'
-      : 'w-[26px] h-[33px] sm:w-[32px] sm:h-[40px]';
+  // Proportional marker sizing fitting comfortably within 1/15th grid cells without row overflow
+  const sizeClasses = isBaseYard
+    ? 'w-[24px] h-[30px] sm:w-[30px] sm:h-[38px]'
+    : scaleFactor === 'small'
+    ? 'w-[10px] h-[13px] sm:w-[13px] sm:h-[16px]'
+    : scaleFactor === 'medium'
+    ? 'w-[12px] h-[15px] sm:w-[16px] sm:h-[20px]'
+    : 'w-[15px] h-[19px] sm:w-[20px] sm:h-[25px]';
 
   return (
     <div
-      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 ${sizeClasses}`}
-      style={{ transform: isTraveling ? 'scale(1.12)' : 'none' }}
+      className={`relative flex items-center justify-center cursor-pointer transition-transform duration-150 -translate-y-[10%] ${sizeClasses}`}
+      style={{ transform: isTraveling ? 'scale(1.15) translateY(-15%)' : 'none' }}
     >
       {isSelectable && (
-        <div className="absolute -inset-1.5 rounded-full bg-emerald-400/50 blur-[4px] animate-pulse pointer-events-none" />
+        <div className="absolute -inset-1 rounded-full bg-emerald-400/50 blur-[3px] animate-pulse pointer-events-none" />
       )}
 
-      {/* Grounding contact shadow centered directly under the pin's base */}
-      <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 w-[60%] h-[14%] rounded-full bg-black/35 blur-[1px] pointer-events-none" />
+      {/* Grounding contact shadow centered directly under the pin's tip */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-[12%] rounded-full bg-black/35 blur-[1px] pointer-events-none" />
 
       <svg
         viewBox="0 0 24 30"
-        className="relative w-full h-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]"
+        className="relative w-full h-full drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.3)]"
         fill="none"
       >
         <path
@@ -671,7 +673,7 @@ const renderPawn = (
           stroke={border}
           strokeWidth="1.2"
         />
-        <circle cx="12" cy="11" r="5" fill="#ffffff" />
+        <circle cx="12" cy="11" r="4.8" fill="#ffffff" />
       </svg>
     </div>
   );
@@ -727,7 +729,7 @@ const renderPawn = (
                 style={!isSelectable ? { borderColor: `${PIN_COLOR_HEX[color].main}33` } : undefined}
               >
                 {inBase ? (
-                  renderPawn(color, isSelectable, false, 'normal')
+                  renderPawn(color, isSelectable, false, 'normal', true)
                 ) : (
                   <div
                     className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-30 shadow-inner"
@@ -1040,8 +1042,8 @@ const renderPawn = (
                             gridRowStart: row,
                             gridColumnStart: col,
                             boxShadow: isHomeStretch
-                              ? 'inset 0 0 0 2px rgba(255,255,255,0.65)'
-                              : 'inset 0 0 0 0.5px rgba(100,116,139,0.28)',
+                              ? 'inset 0 0 0 2px rgba(255,255,255,0.7)'
+                              : 'inset 0 0 0 1px #cbd5e1',
                           }}
                         >
                           {isHomeStretch && !isFinishTile && (
@@ -1110,7 +1112,7 @@ const renderPawn = (
                     onClick={rollDice}
                     className="w-full py-2.5 sm:py-4 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-base shadow-xl disabled:opacity-40 transition-all"
                   >
-                    {isRolling ? 'Rolling Dice...' : hasRolled ? 'Select Pin Marker Below' : 'Roll 3D Casino Dice 🎲'}
+                    {isRolling ? 'Rolling Dice...' : hasRolled ? 'Select Pin Marker Below' : 'Roll 🎲'}
                   </button>
 
                   {/* Live Match Analytics — Collapsible on mobile for 0-scroll viewport fit */}
