@@ -330,9 +330,9 @@ export default function TicTacToePage() {
               )}
             </div>
 
-            {/* 3x3 Grid */}
-            <div className="relative w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] mx-auto aspect-square mb-6">
-              <div className="w-full h-full grid grid-cols-3 gap-2.5">
+            {/* 3x3 Grid - Locked Fixed Dimensions to Prevent Layout Shift */}
+            <div className="relative w-[270px] h-[270px] sm:w-[320px] sm:h-[320px] mx-auto aspect-square mb-6">
+              <div className="w-full h-full grid grid-cols-3 grid-rows-3 gap-3">
                 {board.map((cell, idx) => {
                   const isWinningCell = result?.line.includes(idx);
                   return (
@@ -340,13 +340,23 @@ export default function TicTacToePage() {
                       key={idx}
                       disabled={isOpponentThinking || !!cell || !!result}
                       onClick={() => handleClick(idx)}
-                      className={`rounded-2xl text-2xl sm:text-4xl font-black flex items-center justify-center transition-all duration-200 select-none shadow-md ${
+                      className={`w-full h-full aspect-square rounded-2xl flex items-center justify-center transition-all duration-200 select-none shadow-md overflow-hidden p-0 m-0 ${
                         cell === null
                           ? 'bg-slate-900 hover:bg-slate-800 border-2 border-slate-800'
-                          : 'bg-slate-950 text-white border-2 border-emerald-500/50'
-                      } ${isWinningCell ? 'scale-105 ring-4 ring-emerald-500' : ''}`}
+                          : 'bg-slate-950 border-2 border-emerald-500/50'
+                      } ${isWinningCell ? 'scale-105 ring-4 ring-emerald-500 bg-slate-900' : ''}`}
                     >
-                      {cell}
+                      {cell && (
+                        <span
+                          className={`inline-flex items-center justify-center leading-none text-3xl sm:text-4xl font-extrabold select-none transition-transform duration-200 ${
+                            cell === 'X'
+                              ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+                              : 'text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]'
+                          }`}
+                        >
+                          {cell}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
