@@ -151,7 +151,7 @@ export default function ProfilePage() {
               <div>
                 <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase mb-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Verified Account ({user?.isVerified ? 'OTP Verified ✅' : 'Verified'})</span>
+                  <span>Verified Player ✅</span>
                 </div>
                 <h1 className="text-3xl font-black text-white font-['Space_Grotesk']">
                   {user?.name}

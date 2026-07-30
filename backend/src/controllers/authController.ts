@@ -39,39 +39,9 @@ export const sendOTP = async (req: Request, res: Response) => {
 
     try {
       let user = await User.findOne({ email: cleanEmail });
+      let claimedBonusNow = false;
 
-      // EXISTING USER -> DIRECT LOGIN ACCEPTED WITHOUT OTP!
-      if (user && user.isVerified) {
-        let claimedBonusNow = false;
-        if (!user.hasClaimedSignupBonus) {
-          user.demoBalance = 1000;
-          user.hasClaimedSignupBonus = true;
-          claimedBonusNow = true;
-          await user.save();
-        }
-
-        const token = generateToken(user._id.toString(), user.email);
-        return res.json({
-          success: true,
-          isExistingUser: true,
-          token,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            walletBalance: user.walletBalance,
-            demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000,
-            upiId: user.upiId,
-            avatar: user.avatar,
-            isVerified: true,
-            hasClaimedSignupBonus: user.hasClaimedSignupBonus,
-          },
-          claimedBonusNow,
-          message: `Welcome back, ${user.name}! Direct login successful.`,
-        });
-      }
-
-      // FIRST TIME USER -> CREATE ACCOUNT & SEND OTP
+      // FIRST TIME USER -> CREATE ACCOUNT IMMEDIATELY
       if (!user) {
         user = await User.create({
           name: displayName,
@@ -80,46 +50,43 @@ export const sendOTP = async (req: Request, res: Response) => {
           demoBalance: 1000,
           upiId: `${displayName}@paytm`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
-          isVerified: false,
-          otp,
-          otpExpires,
+          isVerified: true,
+          hasClaimedSignupBonus: true,
         });
+        claimedBonusNow = true;
       } else {
-        user.otp = otp;
-        user.otpExpires = otpExpires;
+        if (!user.hasClaimedSignupBonus) {
+          user.demoBalance = 1000;
+          user.hasClaimedSignupBonus = true;
+          claimedBonusNow = true;
+        }
+        user.isVerified = true;
         await user.save();
       }
 
-      await sendOTPEmail(cleanEmail, otp, user.name);
+      const token = generateToken(user._id.toString(), user.email);
       return res.json({
         success: true,
-        message: `Preview Mode Active! OTP code is 1234.`,
-        devOtp: '1234',
+        isExistingUser: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          walletBalance: user.walletBalance,
+          demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000,
+          upiId: user.upiId,
+          avatar: user.avatar,
+          isVerified: true,
+          hasClaimedSignupBonus: user.hasClaimedSignupBonus,
+        },
+        claimedBonusNow,
+        message: `Welcome ${user.name}! Direct email login successful.`,
       });
     } catch (dbErr) {
       let mockUser = fallbackUsers.get(cleanEmail);
+      let claimedBonusNow = false;
 
-      // EXISTING FALLBACK USER -> DIRECT LOGIN
-      if (mockUser && mockUser.isVerified) {
-        const token = generateToken(mockUser.id, mockUser.email);
-        return res.json({
-          success: true,
-          isExistingUser: true,
-          token,
-          user: {
-            id: mockUser.id,
-            name: mockUser.name,
-            email: mockUser.email,
-            walletBalance: mockUser.walletBalance,
-            upiId: mockUser.upiId,
-            avatar: mockUser.avatar,
-            isVerified: true,
-          },
-          message: `Welcome back, ${mockUser.name}! Direct login successful.`,
-        });
-      }
-
-      // FIRST TIME FALLBACK USER -> SEND OTP
       if (!mockUser) {
         mockUser = {
           id: 'user_' + Date.now(),
@@ -129,21 +96,31 @@ export const sendOTP = async (req: Request, res: Response) => {
           demoBalance: 1000,
           upiId: `${displayName}@paytm`,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`,
-          isVerified: false,
-          otp,
-          otpExpires,
+          isVerified: true,
+          hasClaimedSignupBonus: true,
         };
-      } else {
-        mockUser.otp = otp;
-        mockUser.otpExpires = otpExpires;
+        fallbackUsers.set(cleanEmail, mockUser);
+        claimedBonusNow = true;
       }
-      fallbackUsers.set(cleanEmail, mockUser);
 
-      await sendOTPEmail(cleanEmail, otp, mockUser.name);
+      const token = generateToken(mockUser.id, mockUser.email);
       return res.json({
         success: true,
-        message: `Preview Mode Active! OTP code is 1234.`,
-        devOtp: '1234',
+        isExistingUser: true,
+        token,
+        user: {
+          id: mockUser.id,
+          name: mockUser.name,
+          email: mockUser.email,
+          walletBalance: mockUser.walletBalance,
+          demoBalance: mockUser.demoBalance !== undefined ? mockUser.demoBalance : 1000,
+          upiId: mockUser.upiId,
+          avatar: mockUser.avatar,
+          isVerified: true,
+          hasClaimedSignupBonus: true,
+        },
+        claimedBonusNow,
+        message: `Welcome ${mockUser.name}! Direct email login successful.`,
       });
     }
   } catch (error: any) {
