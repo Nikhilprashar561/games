@@ -22,7 +22,7 @@ const AdminSettingsSchema: Schema = new Schema({
   },
   upiId: {
     type: String,
-    default: 'baaziboard@paytm',
+    default: '',
   },
   upiHolderName: {
     type: String,

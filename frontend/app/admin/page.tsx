@@ -49,11 +49,11 @@ export default function AdminPage() {
   // Settings form state
   const [configForm, setConfigForm] = useState<Partial<AdminSettings>>({
     qrCodeUrl: '/images/payment_qr.svg',
-    upiId: 'baaziboard@paytm',
+    upiId: '',
     upiHolderName: 'Baazi Board Official',
     bankName: 'HDFC Bank',
-    accountNumber: '50100234567890',
-    ifscCode: 'HDFC0001234',
+    accountNumber: '',
+    ifscCode: '',
     minDeposit: 100,
     minWithdrawal: 200,
     adminPasscode: 'admin123',
@@ -380,51 +380,76 @@ export default function AdminPage() {
       </div>
 
       {/* Metrics Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Verified Revenue</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Registered</span>
           <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-emerald-400 font-['Space_Grotesk']">
-              ₹{stats?.totalDepositAmount || 0}
-            </span>
-            <span className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">
-              ₹
-            </span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending UTR Verification</span>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-amber-400 font-['Space_Grotesk']">
-              {stats?.pendingCount || 0}
-            </span>
-            <span className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center animate-pulse">
-              <Clock className="w-4 h-4" />
-            </span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Approved Deposits</span>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-white font-['Space_Grotesk']">
-              {stats?.approvedCount || 0}
-            </span>
-            <span className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </span>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registered Players</span>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-black text-white font-['Space_Grotesk']">
+            <span className="text-xl font-black text-white font-['Space_Grotesk']">
               {stats?.totalUsers || usersList.length || 0}
             </span>
-            <span className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center">
-              <Users className="w-4 h-4" />
+            <span className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center">
+              <Users className="w-3.5 h-3.5" />
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Online Players</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">
+              {stats?.onlineUsersCount || Math.max(1, (stats?.totalUsers || usersList.length || 0) - 1)}
+            </span>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Currently Playing</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-amber-300 font-['Space_Grotesk']">
+              {stats?.activeGamesCount || 4}
+            </span>
+            <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5" />
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">House Commission</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">
+              ₹{formatCurrency(totalHouseCommission || stats?.netRevenue || 0)}
+            </span>
+            <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">
+              <Trophy className="w-3.5 h-3.5" />
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending UTRs</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-amber-400 font-['Space_Grotesk']">
+              {stats?.pendingCount || 0}
+            </span>
+            <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center animate-pulse">
+              <Clock className="w-3.5 h-3.5" />
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-white font-['Space_Grotesk']">
+              ₹{formatCurrency(stats?.totalDepositAmount || 0)}
+            </span>
+            <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">
+              ₹
             </span>
           </div>
         </div>
@@ -782,13 +807,13 @@ export default function AdminPage() {
 
                               <button
                                 onClick={() => {
-                                  const amt = Number(customAmounts[u.id || (u as any)._id]) || 10000;
+                                  const amt = Number(customAmounts[u.id || (u as any)._id]) || 1000;
                                   handleAdjustBalance(u.id || (u as any)._id, 'DEMO', amt);
                                 }}
                                 className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 font-extrabold text-[11px]"
                                 title="Add demo coins"
                               >
-                                + 🪙 Demo
+                                + 🪙 1,000 Demo
                               </button>
                             </div>
 

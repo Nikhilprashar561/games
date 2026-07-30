@@ -106,7 +106,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
 
   const handleOpenUPIApp = (e: React.MouseEvent, appName: string, customScheme?: string) => {
     e.preventDefault();
-    const activeUpi = config?.upiId || 'baaziboard@paytm';
+    const activeUpi = config?.upiId || '';
+    if (!activeUpi) {
+      setFeedback({
+        type: 'error',
+        message: 'Admin has not configured a payment UPI ID yet. Please scan QR code or contact support.',
+      });
+      return;
+    }
     const numAmt = amount || '500';
     const upiUri = customScheme || `upi://pay?pa=${encodeURIComponent(activeUpi)}&pn=BaaziBoard&am=${numAmt}&cu=INR&tn=BaaziBoardDeposit`;
 
@@ -161,7 +168,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
       if (res.success) {
         setFeedback({
           type: 'success',
-          message: `Deposit request of ₹${numAmount} submitted! (Ref: ${cleanRef}). Auto-verification in progress.`,
+          message: `🎉 Your request for ₹${numAmount} (Ref: ${cleanRef}) has been submitted! Your amount will be credited to your wallet under 10 minutes after verification.`,
         });
         setUtr('');
         loadHistory();
@@ -319,9 +326,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                         alt="Baazi Board UPI QR"
                         className="w-full h-full object-contain rounded-lg"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                            config?.upiId || 'baaziboard@paytm'
-                          )}`;
+                          if (config?.upiId) {
+                            (e.target as HTMLImageElement).src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(config.upiId)}`;
+                          }
                         }}
                       />
                     </div>
@@ -332,7 +339,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                     <div>
                       <span className="text-[11px] text-slate-400 font-bold block mb-0.5">Official UPI ID:</span>
                       <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800">
-                        <span className="font-extrabold text-emerald-400 text-xs truncate">{config?.upiId || 'baaziboard@paytm'}</span>
+                        <span className="font-extrabold text-emerald-400 text-xs truncate">{config?.upiId || 'Not Configured (Admin Panel)'}</span>
                         <button
                           type="button"
                           onClick={handleCopyUpi}
@@ -377,7 +384,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                   <div className="grid grid-cols-4 gap-1.5">
                     {/* PhonePe */}
                     <a
-                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
                       onClick={(e) => handleOpenUPIApp(e, 'PhonePe')}
                       className="p-2 rounded-xl bg-[#5F259F]/20 hover:bg-[#5F259F]/40 border border-[#5F259F]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
@@ -387,7 +394,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
 
                     {/* Google Pay */}
                     <a
-                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
                       onClick={(e) => handleOpenUPIApp(e, 'Google Pay')}
                       className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
@@ -397,8 +404,8 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
 
                     {/* Paytm */}
                     <a
-                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
-                      onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      onClick={(e) => handleOpenUPIApp(e, 'Paytm', `paytmmp://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR`)}
                       className="p-2 rounded-xl bg-[#002E6E]/30 hover:bg-[#002E6E]/50 border border-[#00BAF2]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >
                       <img src="/images/paytm.png" alt="Paytm" className="w-7 h-7 object-contain rounded-lg" />
@@ -407,7 +414,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
 
                     {/* BHIM */}
                     <a
-                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || 'baaziboard@paytm')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
+                      href={`upi://pay?pa=${encodeURIComponent(config?.upiId || '')}&pn=BaaziBoard&am=${amount || '500'}&cu=INR&tn=BaaziBoardDeposit`}
                       onClick={(e) => handleOpenUPIApp(e, 'BHIM / UPI')}
                       className="p-2 rounded-xl bg-[#008853]/20 hover:bg-[#008853]/40 border border-[#008853]/50 text-white font-extrabold text-[11px] flex flex-col items-center justify-center space-y-1 transition-all shadow-sm cursor-pointer hover:scale-105"
                     >

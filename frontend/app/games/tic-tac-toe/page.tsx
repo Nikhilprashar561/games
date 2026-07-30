@@ -17,6 +17,11 @@ export default function TicTacToePage() {
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
 
+  // Enforce Demo Mode for Tic-Tac-Toe
+  React.useEffect(() => {
+    setPlayMode('DEMO');
+  }, []);
+
   const [board, setBoard] = useState<BoardState>(Array(9).fill(null));
   const [isXNext, setIsXNext] = useState<boolean>(true);
   const [opponentName, setOpponentName] = useState<string>('Rohan_Gamer');
@@ -203,6 +208,12 @@ export default function TicTacToePage() {
             <User className="w-4 h-4" />
             <span>Matched: {opponentName}</span>
           </div>
+        </div>
+
+        {/* Demo Mode Only Notice */}
+        <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-extrabold text-xs flex items-center space-x-2">
+          <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span>🎮 Tic Tac Toe is available exclusively in Demo Practice Mode (Demo Coins). Real Cash mode is disabled for this game.</span>
         </div>
 
         {/* Score Board */}

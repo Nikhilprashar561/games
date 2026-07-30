@@ -9,7 +9,7 @@ import { LogOut, User as UserIcon, ChevronDown, Play, Dices, Wallet, PlusCircle,
 import { formatCurrency, formatCoins } from '../utils/formatCurrency';
 
 export const Navbar: React.FC = () => {
-  const { user, openAuthModal, logout, welcomeToast, playMode, setPlayMode } = useAuth();
+  const { user, loading, openAuthModal, logout, welcomeToast, playMode, setPlayMode } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
   const [addMoneyTab, setAddMoneyTab] = useState<'DEPOSIT' | 'STATUS' | 'WITHDRAW'>('DEPOSIT');
@@ -194,7 +194,7 @@ export const Navbar: React.FC = () => {
               )}
 
               {/* Login Button */}
-              {!user && (
+              {!loading && !user && (
                 <button
                   onClick={openAuthModal}
                   className="hidden md:flex px-4 py-2 rounded-xl font-extrabold text-sm bg-white hover:bg-slate-100 text-slate-900 shadow-md transition-all border border-emerald-500/30"
