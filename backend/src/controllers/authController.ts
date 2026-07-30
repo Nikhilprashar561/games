@@ -264,7 +264,7 @@ export const updateName = async (req: AuthRequest, res: Response) => {
       if (user) {
         user.name = cleanName;
         await user.save();
-        return res.json({ success: true, user: { id: user._id, name: user.name, email: user.email, walletBalance: user.walletBalance, avatar: user.avatar, isVerified: user.isVerified } });
+        return res.json({ success: true, user: { id: user._id, name: user.name, email: user.email, walletBalance: user.walletBalance, demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000, upiId: user.upiId, avatar: user.avatar, isVerified: user.isVerified } });
       }
     } catch (err) {
       for (const [email, u] of fallbackUsers.entries()) {
@@ -350,7 +350,7 @@ export const verifyEmailChange = async (req: AuthRequest, res: Response) => {
         return res.json({
           success: true,
           token: newToken,
-          user: { id: user._id, name: user.name, email: user.email, walletBalance: user.walletBalance, avatar: user.avatar, isVerified: user.isVerified },
+          user: { id: user._id, name: user.name, email: user.email, walletBalance: user.walletBalance, demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000, upiId: user.upiId, avatar: user.avatar, isVerified: user.isVerified },
         });
       }
     } catch (err) {
@@ -379,6 +379,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
             name: user.name,
             email: user.email,
             walletBalance: user.walletBalance,
+            demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000,
             upiId: user.upiId,
             avatar: user.avatar,
             isVerified: user.isVerified,
@@ -395,6 +396,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
               name: u.name,
               email: u.email,
               walletBalance: u.walletBalance,
+              demoBalance: u.demoBalance !== undefined ? u.demoBalance : 1000,
               upiId: u.upiId,
               avatar: u.avatar,
               isVerified: u.isVerified || true,

@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const res = await axios.get('/api/auth/me');
         if (res.data.success) {
           const freshUser = res.data.user;
-          if (freshUser.demoBalance === undefined || freshUser.demoBalance === 10000) freshUser.demoBalance = 1000;
+          if (freshUser.demoBalance === undefined) freshUser.demoBalance = 1000;
           setUser(freshUser);
           localStorage.setItem('user_session', JSON.stringify(freshUser));
         }

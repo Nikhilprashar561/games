@@ -1,11 +1,11 @@
 'use client';
 
-import { formatCurrency } from '../../utils/formatCurrency';
+import { formatCurrency, formatCoins } from '../../utils/formatCurrency';
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
-import { User as UserIcon, Wallet, ShieldCheck, ArrowLeft, Gamepad2, BarChart3, Filter, PlusCircle, Edit2, Mail, CheckCircle2, AlertCircle, KeyRound } from 'lucide-react';
+import { User as UserIcon, Wallet, Coins, ShieldCheck, ArrowLeft, Gamepad2, BarChart3, Filter, PlusCircle, Edit2, Mail, CheckCircle2, AlertCircle, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { GameMatchLog, GameStats } from '../../types';
 import { gamesData } from '../../data/gamesData';
@@ -162,26 +162,41 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Wallet & Topup Button */}
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-center min-w-[180px]">
+            {/* Wallet & Demo Coins Cards + Topup Button */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full md:w-auto">
+              {/* Real Money Card */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-center min-w-[150px] sm:min-w-[170px]">
                 <div className="flex items-center space-x-1.5 text-xs font-extrabold text-emerald-400 uppercase">
                   <Wallet className="w-4 h-4" />
-                  <span>Real Money Wallet</span>
+                  <span>Real Wallet</span>
                 </div>
-                <p className="text-3xl font-black text-emerald-400 mt-1 font-['Space_Grotesk']">
+                <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-1 font-['Space_Grotesk']">
                   ₹{formatCurrency(user?.walletBalance)}
                 </p>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate max-w-[140px]">
                   UPI: {user?.upiId || 'user@paytm'}
+                </p>
+              </div>
+
+              {/* Demo Coins Card */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col justify-center min-w-[150px] sm:min-w-[170px]">
+                <div className="flex items-center space-x-1.5 text-xs font-extrabold text-amber-400 uppercase">
+                  <Coins className="w-4 h-4" />
+                  <span>Demo Coins</span>
+                </div>
+                <p className="text-2xl sm:text-3xl font-black text-amber-400 mt-1 font-['Space_Grotesk']">
+                  🪙 {formatCoins(user?.demoBalance !== undefined ? user.demoBalance : 1000)}
+                </p>
+                <p className="text-[10px] font-bold text-amber-400/70 mt-0.5">
+                  Free Practice Coins
                 </p>
               </div>
 
               <button
                 onClick={() => setIsAddMoneyOpen(true)}
-                className="px-6 py-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/25 transition-all flex flex-col items-center justify-center space-y-1"
+                className="px-5 py-4 sm:px-6 sm:py-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-xl shadow-emerald-500/25 transition-all flex flex-col items-center justify-center space-y-1"
               >
-                <PlusCircle className="w-6 h-6" />
+                <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                 <span>Add Money</span>
               </button>
             </div>
