@@ -277,15 +277,15 @@ export default function AdminPage() {
   // PASSCODE AUTH SCREEN
   if (!isAuthenticated) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <div className="w-full max-w-md p-8 glass-panel rounded-3xl border border-slate-800 shadow-2xl bg-[#0a0f1d] text-white relative overflow-hidden">
+      <div className="min-h-[80vh] flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-md p-5 sm:p-8 glass-panel rounded-2xl sm:rounded-3xl border border-slate-800 shadow-2xl bg-[#0a0f1d] text-white relative overflow-hidden">
           <div className="absolute -top-20 -right-20 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-2xl bg-gradient-to-tr from-amber-600 to-yellow-400 shadow-lg shadow-amber-500/30 text-white">
-              <Shield className="w-8 h-8" />
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 mb-3 sm:mb-4 rounded-2xl bg-gradient-to-tr from-amber-600 to-yellow-400 shadow-lg shadow-amber-500/30 text-white">
+              <Shield className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
-            <h1 className="text-2xl font-black text-white font-['Space_Grotesk'] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-white font-['Space_Grotesk'] tracking-tight">
               Admin Verification Portal
             </h1>
             <p className="text-xs text-slate-400 mt-1 font-semibold">
@@ -321,7 +321,7 @@ export default function AdminPage() {
             <button
               type="submit"
               disabled={authenticating}
-              className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-extrabold rounded-xl shadow-lg shadow-amber-500/25 transition-all text-sm flex items-center justify-center space-x-2"
+              className="w-full py-3.5 sm:py-4 bg-amber-600 hover:bg-amber-500 text-white font-extrabold rounded-xl shadow-lg shadow-amber-500/25 transition-all text-sm flex items-center justify-center space-x-2"
             >
               <span>{authenticating ? 'Authenticating...' : 'Unlock Admin Portal 🔐'}</span>
             </button>
@@ -336,31 +336,31 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in text-white">
+    <div className="max-w-7xl mx-auto space-y-6 pb-16 px-2 sm:px-4">
       
       {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-3xl border border-slate-800 shadow-xl bg-[#0a0f1d]">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
-            <Shield className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 shadow-xl bg-[#0a0f1d]">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 flex-shrink-0">
+            <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-black text-white font-['Space_Grotesk']">Admin Verification Dashboard</h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] uppercase">
+              <h1 className="text-lg sm:text-2xl font-black text-white font-['Space_Grotesk']">Admin Verification Dashboard</h1>
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] uppercase hidden sm:inline-block">
                 Live Portal
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 font-semibold">
-              Verify 12-digit UTR payment transactions, upload QR code from gallery & distribute player balances
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-semibold">
+              Verify 12-digit UTR payment transactions, upload QR code & distribute player balances
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5 sm:space-x-3">
           <button
             onClick={loadDashboardData}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700 transition-all"
+            className="px-3 sm:px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700 transition-all"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingDeposits ? 'animate-spin' : ''}`} />
             <span>Refresh Data</span>
@@ -371,7 +371,7 @@ export default function AdminPage() {
               localStorage.removeItem('admin_passcode_token');
               setIsAuthenticated(false);
             }}
-            className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition-all flex items-center space-x-1"
+            className="px-3 sm:px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/20 transition-all flex items-center space-x-1"
           >
             <Lock className="w-3.5 h-3.5" />
             <span>Lock</span>
@@ -380,7 +380,7 @@ export default function AdminPage() {
       </div>
 
       {/* Metrics Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Registered</span>
           <div className="flex items-center justify-between">

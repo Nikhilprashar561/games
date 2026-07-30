@@ -47,36 +47,36 @@ export const Navbar: React.FC = () => {
   if (isAdminRoute) {
     return (
       <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#05070b]/95 border-b border-amber-500/30 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 sm:h-20 gap-2">
             
             {/* Admin Header Title */}
-            <Link href="/admin" className="flex items-center space-x-2.5">
-              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400 shadow-lg shadow-amber-500/10">
-                <Shield className="w-5 h-5" />
+            <Link href="/admin" className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
+              <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400 shadow-lg shadow-amber-500/10 flex-shrink-0">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div className="flex flex-col">
-                <div className="flex items-center space-x-2">
-                  <span className="text-base sm:text-xl font-black text-white font-['Space_Grotesk']">
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  <span className="text-sm sm:text-xl font-black text-white font-['Space_Grotesk'] truncate">
                     BAAZI BOARD
                   </span>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    Admin Portal
+                  <span className="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30 flex-shrink-0">
+                    Admin
                   </span>
                 </div>
-                <span className="text-[10px] font-semibold text-slate-400">
+                <span className="text-[10px] font-semibold text-slate-400 hidden sm:block">
                   Verification & Management System
                 </span>
               </div>
             </Link>
 
             {/* Exit Admin Button */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <Link
                 href="/"
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all flex items-center space-x-1.5 shadow-md"
+                className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] sm:text-xs border border-slate-700 transition-all flex items-center space-x-1 shadow-md whitespace-nowrap"
               >
-                <span>🎮 Exit Admin & Go to Games</span>
+                <span>🎮 <span className="hidden sm:inline">Exit Admin & Go to Games</span><span className="sm:hidden inline">Exit Admin</span></span>
               </Link>
             </div>
 
