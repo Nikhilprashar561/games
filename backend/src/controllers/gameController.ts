@@ -204,7 +204,8 @@ export const getAllGameLogs = async (req: AuthRequest, res: Response) => {
   try {
     try {
       const logs = await GameLog.find({}).sort({ playedAt: -1 }).limit(100);
-      const totalAdminCommission = logs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const rawCommission = logs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const totalAdminCommission = Math.round(rawCommission * 100) / 100;
 
       return res.json({
         success: true,
@@ -212,7 +213,8 @@ export const getAllGameLogs = async (req: AuthRequest, res: Response) => {
         logs,
       });
     } catch (dbErr) {
-      const totalAdminCommission = fallbackLogs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const rawCommission = fallbackLogs.reduce((sum, l) => sum + (l.adminCommission || 0), 0);
+      const totalAdminCommission = Math.round(rawCommission * 100) / 100;
       return res.json({
         success: true,
         totalAdminCommission,

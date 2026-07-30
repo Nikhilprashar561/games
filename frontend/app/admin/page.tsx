@@ -609,7 +609,7 @@ export default function AdminPage() {
 
                         <td className="py-4 px-4">
                           <span className={`font-black text-sm ${req.type === 'DEPOSIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {req.type === 'DEPOSIT' ? '➕ Deposit' : '➖ Withdrawal'} ₹{req.amount}
+                            {req.type === 'DEPOSIT' ? '➕ Deposit' : '➖ Withdrawal'} ₹{formatCurrency(req.amount)}
                           </span>
                           <span className="block text-[10px] text-slate-400 font-bold uppercase">{req.paymentMethod}</span>
                         </td>
@@ -1111,7 +1111,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total House Commission Collected</span>
-                <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">₹{totalHouseCommission}</span>
+                <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">₹{formatCurrency(totalHouseCommission)}</span>
               </div>
             </div>
             <div className="text-right text-xs font-bold text-slate-400">
@@ -1165,7 +1165,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-4 px-4 font-black text-slate-300">
-                          {log.playMode === 'REAL' ? `₹${log.entryFee || 10}` : `🪙${log.entryFee || 100}`}
+                          {log.playMode === 'REAL' ? `₹${formatCurrency(log.entryFee || 0)}` : `🪙 ${formatCoins(log.entryFee || 0)}`}
                         </td>
                         <td className="py-4 px-4">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
@@ -1175,10 +1175,10 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-4 px-4 font-black text-emerald-400">
-                          {log.playMode === 'REAL' ? `₹${log.amountWon || 0}` : `🪙${log.amountWon || 0}`}
+                          {log.playMode === 'REAL' ? `₹${formatCurrency(log.amountWon || 0)}` : `🪙 ${formatCoins(log.amountWon || 0)}`}
                         </td>
                         <td className="py-4 px-4 font-black text-amber-400">
-                          {log.playMode === 'REAL' ? `+₹${log.adminCommission || 0}` : `0`}
+                          {log.playMode === 'REAL' ? `+₹${formatCurrency(log.adminCommission || 0)}` : `0`}
                         </td>
                         <td className="py-4 px-4 font-semibold text-slate-400">
                           {new Date(log.playedAt || Date.now()).toLocaleString('en-IN')}
