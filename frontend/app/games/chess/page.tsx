@@ -288,7 +288,6 @@ export default function ChessPage() {
       // Checkmate or Stalemate
       if (isKingInCheck) {
         setGameWinner(user?.name || 'Player');
-        await updateWalletBalance(WIN_REWARD);
         await recordGameMatch('chess', 'Grandmaster Chess', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
         confetti({ particleCount: 120, spread: 80 });
       } else {
@@ -399,7 +398,6 @@ export default function ChessPage() {
     if (targetPiece && targetPiece.type === 'k') {
       const winnerName = user?.name || 'Player';
       setGameWinner(winnerName);
-      await updateWalletBalance(WIN_REWARD);
       await recordGameMatch('chess', 'Grandmaster Chess', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
       confetti({ particleCount: 120, spread: 80 });
     }
@@ -456,7 +454,6 @@ export default function ChessPage() {
         if (targetPiece && targetPiece.type === 'k') {
           const winnerName = user?.name || 'Player';
           setGameWinner(winnerName);
-          await updateWalletBalance(WIN_REWARD);
           await recordGameMatch('chess', 'Grandmaster Chess', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
           confetti({ particleCount: 120, spread: 80 });
         }

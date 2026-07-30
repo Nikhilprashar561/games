@@ -709,7 +709,6 @@ export default function TeenPattiPage() {
     if (state.result.winnerId === 'user') {
       const loserSeat = state.result.showdown ? (state.result.showdown.a === 'user' ? state.result.showdown.b : state.result.showdown.a) : undefined;
       const payout = Math.round(state.result.potWon * 0.88 * 100) / 100;
-      updateWalletBalance(payout);
       recordGameMatch(
         'teen-patti',
         'Teen Patti Gold',

@@ -129,8 +129,6 @@ export default function TicTacToePage() {
       } else if (winCheck?.winner === 'Draw') {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
         setGameState('ENDED');
-        // Refund entry fee on draw
-        updateDemoBalance(ENTRY_COST);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
     }, 1200); // 1.2s Human AI response latency
@@ -172,8 +170,6 @@ export default function TicTacToePage() {
       setGameState('ENDED');
       if (winCheck.winner === 'X') {
         setScores((prev) => ({ ...prev, x: prev.x + 1 }));
-        // Credit win reward
-        updateDemoBalance(WIN_REWARD);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
         confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
       } else if (winCheck.winner === 'O') {
@@ -181,8 +177,6 @@ export default function TicTacToePage() {
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'LOSS', ENTRY_COST, 0, opponentName);
       } else {
         setScores((prev) => ({ ...prev, draws: prev.draws + 1 }));
-        // Refund entry fee on draw
-        updateDemoBalance(ENTRY_COST);
         recordGameMatch('tic-tac-toe', 'Tic Tac Toe Pro', 'DRAW', ENTRY_COST, ENTRY_COST, opponentName);
       }
     } else {

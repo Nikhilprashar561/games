@@ -28,28 +28,28 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
       adminCommission = 0;
       if (result === 'WIN') {
         amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round(fee * 1.8);
-        balanceDelta = amountWon - fee;
+        balanceDelta = amountWon; // Entry fee was debited upfront, credit winning payout
       } else if (result === 'LOSS') {
         amountWon = 0;
-        balanceDelta = -fee;
+        balanceDelta = 0; // Entry fee was debited upfront, no additional deduction on loss
       } else {
         amountWon = fee;
-        balanceDelta = 0;
+        balanceDelta = fee; // Refund entry fee on draw
       }
     } else {
       if (result === 'WIN') {
         // 12% cut of the winning pot to admin, 88% to winner
         adminCommission = Math.round(totalPot * 0.12 * 100) / 100;
         amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round((totalPot - adminCommission) * 100) / 100;
-        balanceDelta = amountWon - fee; // Net profit
+        balanceDelta = amountWon; // Entry fee was debited upfront, credit winning payout
       } else if (result === 'LOSS') {
         amountWon = 0;
         adminCommission = fee; // Whole bet amount goes to admin
-        balanceDelta = -fee; // Net loss
+        balanceDelta = 0; // Entry fee was debited upfront, no additional deduction on loss
       } else if (result === 'DRAW') {
         amountWon = fee; // Entry fee refunded
         adminCommission = 0;
-        balanceDelta = 0; // Net zero
+        balanceDelta = fee; // Refund entry fee on draw
       }
     }
 

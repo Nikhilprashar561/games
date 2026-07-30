@@ -130,7 +130,6 @@ export default function NumberPredictPage() {
     setFlippedIndex(index);
 
     if (selected.reward > 0) {
-      await updateWalletBalance(selected.reward);
       await recordGameMatch('number-predict', 'Number Predict & Win', 'WIN', ENTRY_COST, selected.reward, 'Jackpot Grid');
       setSessionStats((s) => ({
         ...s,

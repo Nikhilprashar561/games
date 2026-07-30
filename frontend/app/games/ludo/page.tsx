@@ -563,7 +563,6 @@ export default function LudoPage() {
           const winnerName = color === userColor ? (user?.name || 'Player') : opponentName;
           setWinner(winnerName);
           if (color === userColor) {
-            updateWalletBalance(WIN_REWARD);
             recordGameMatch('ludo', 'Ludo Star Supreme', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
             confetti({ particleCount: 150, spread: 90 });
           } else {

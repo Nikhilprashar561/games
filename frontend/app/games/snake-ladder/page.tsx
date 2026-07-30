@@ -659,7 +659,6 @@ export default function SnakeLadderPage() {
       const winnerName = user?.name || 'Player';
       setWinner(winnerName);
       playSound('win');
-      await updateWalletBalance(WIN_REWARD);
       await recordGameMatch('snake-ladder', 'Snake & Ladder Supreme', 'WIN', ENTRY_COST, WIN_REWARD, opponentName);
       confetti({ particleCount: 150, spread: 90 });
     } else if (bonus) {

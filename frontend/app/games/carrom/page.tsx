@@ -594,7 +594,6 @@ export default function CarromPage() {
       g.winnerLocked = true;
       const winnerName = user?.name || 'Player';
       setWinner(winnerName);
-      updateWalletBalance(winReward);
       recordGameMatch('carrom', 'Pro Carrom Board', 'WIN', entryCost, winReward, opponentName);
       confetti({ particleCount: 120, spread: 80 });
       setIsSimulating(false);
