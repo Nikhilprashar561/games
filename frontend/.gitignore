@@ -10,6 +10,11 @@
 /.next/
 /out/
 
+.env.example
+.env.local
+.env.production
+.env
+
 # production
 /build
 /dist
