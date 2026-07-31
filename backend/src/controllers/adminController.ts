@@ -1,58 +1,43 @@
 import { Request, Response } from 'express';
-import User from '../models/User';
 import DepositRequest from '../models/DepositRequest';
 import WithdrawalRequest from '../models/WithdrawalRequest';
+import User from '../models/User';
 import WalletTransaction from '../models/WalletTransaction';
 import AdminSettings from '../models/AdminSettings';
 import GameLog from '../models/GameLog';
 import { uploadImageToCloudinary } from '../utils/cloudinary';
 
-// Helper: Ensure default AdminSettings exists in MongoDB
-export const getOrCreateAdminSettings = async () => {
-  let settings = await AdminSettings.findOne();
-  if (!settings) {
-    settings = await AdminSettings.create({
-      qrCodeUrl: '/images/payment_qr.svg',
-      upiId: 'baazigames@upi',
-      upiHolderName: 'Baazi Board Official',
-      bankName: 'HDFC Bank Ltd',
-      accountNumber: '50100234891234',
-      ifscCode: 'HDFC0001234',
-      minDeposit: 10,
-      minWithdrawal: 100,
-      adminPasscode: 'admin123',
-      isQrEnabled: true,
-      isBankEnabled: true,
-    });
-  }
-  return settings;
-};
-
-// @desc    Verify Admin Passcode
+// @desc    Admin Passcode Verification Login
 // @route   POST /api/admin/login
 export const verifyAdminPasscode = async (req: Request, res: Response) => {
   try {
     const { passcode } = req.body;
-    const settings = await getOrCreateAdminSettings();
+    const settings = await AdminSettings.findOne({});
+    const correctPasscode = settings?.adminPasscode || 'admin123';
 
-    if (passcode === settings.adminPasscode || passcode === 'admin123' || passcode === '7d_admin_secret_2026') {
-      return res.json({ success: true, message: 'Admin authentication successful' });
+    if (!passcode || passcode.trim() !== correctPasscode) {
+      return res.status(401).json({ success: false, message: 'Invalid Admin Security Passcode' });
     }
-    return res.status(401).json({ success: false, message: 'Invalid Admin Passcode' });
+
+    return res.json({
+      success: true,
+      message: 'Admin Passcode verified successfully!',
+      token: 'admin_authenticated_' + Date.now(),
+    });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message || 'Admin login failed' });
+    return res.status(500).json({ success: false, message: error.message || 'Passcode verification failed' });
   }
 };
 
-// @desc    Get All Deposit Requests
+// @desc    Get Deposits Queue (Filtered by Status: PENDING / UNDER_REVIEW / APPROVED / REJECTED)
 // @route   GET /api/admin/deposits
 export const getDeposits = async (req: Request, res: Response) => {
   try {
     const { status, search } = req.query;
-    const filter: any = { type: 'DEPOSIT' };
+    const filter: any = {};
 
     if (status && status !== 'ALL') {
-      filter.status = String(status).toUpperCase();
+      filter.status = status;
     }
 
     if (search) {
@@ -67,7 +52,7 @@ export const getDeposits = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Get All Withdrawal Requests with Live 4-Hour SLA Data
+// @desc    Get Withdrawal Requests (with 4-Hour SLA Timer Calculation)
 // @route   GET /api/admin/withdrawals
 export const getWithdrawals = async (req: Request, res: Response) => {
   try {
@@ -75,7 +60,7 @@ export const getWithdrawals = async (req: Request, res: Response) => {
     const filter: any = {};
 
     if (status && status !== 'ALL') {
-      filter.status = String(status).toUpperCase();
+      filter.status = status;
     }
 
     if (search) {
@@ -103,91 +88,141 @@ export const getWithdrawals = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Approve Deposit Request (Credit User Real Cash Balance + Record Financial Audit)
+// @desc    Approve Deposit Request (Single Record Lifecycle: Credits Verified Payment to User Wallet)
 // @route   POST /api/admin/deposits/approve
 export const approveDeposit = async (req: Request, res: Response) => {
   try {
-    const { requestId, adminNote, adminProofScreenshotUrl } = req.body;
+    const { requestId, approvedAmount, adminNote, remarks, adminProofScreenshotUrl } = req.body;
     if (!requestId) {
-      return res.status(400).json({ success: false, message: 'Request ID is required' });
+      return res.status(400).json({ success: false, message: 'Deposit Request ID is required' });
     }
 
     const depositReq = await DepositRequest.findById(requestId);
     if (!depositReq) {
-      return res.status(404).json({ success: false, message: 'Deposit request not found' });
+      return res.status(404).json({ success: false, message: 'Deposit request record not found' });
     }
 
-    if (depositReq.status !== 'PENDING') {
+    if (depositReq.status === 'APPROVED') {
       return res.status(400).json({
         success: false,
-        message: `Request is already ${depositReq.status}`,
+        message: 'This deposit request has already been approved and credited.',
+      });
+    }
+
+    if (depositReq.status === 'REJECTED') {
+      return res.status(400).json({
+        success: false,
+        message: 'This deposit request was rejected. A new deposit request must be submitted by the user.',
       });
     }
 
     const user = await User.findById(depositReq.userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Associated user profile not found' });
+      return res.status(404).json({ success: false, message: 'Associated user account not found' });
     }
 
     // Upload Admin Proof Screenshot if provided
-    let finalProofUrl = '';
+    let finalProofUrl = depositReq.adminProofScreenshotUrl || '';
     if (adminProofScreenshotUrl) {
       finalProofUrl = await uploadImageToCloudinary(adminProofScreenshotUrl, 'baazi_admin_proofs');
     }
 
-    // Credit real cash balance to user wallet
-    user.walletBalance = Math.round(((user.walletBalance || 0) + depositReq.amount) * 100) / 100;
+    const creditAmount = Number(approvedAmount) > 0 ? Number(approvedAmount) : depositReq.amount;
+
+    // Credit real cash balance to user wallet ONLY via verified deposit approval
+    user.walletBalance = Math.round(((user.walletBalance || 0) + creditAmount) * 100) / 100;
     await user.save();
 
+    // Update single Deposit record with full approval lifecycle metadata
     depositReq.status = 'APPROVED';
-    depositReq.adminNote = adminNote || 'Approved & Verified by Admin';
+    depositReq.approvedAmount = creditAmount;
+    depositReq.approvedBy = (req as any).user?.email || 'Admin Portal';
+    depositReq.approvalTime = new Date();
+    depositReq.remarks = remarks || adminNote || 'Payment Verified & Wallet Credited';
+    depositReq.adminNote = adminNote || remarks || 'Payment Verified & Wallet Credited';
     depositReq.adminProofScreenshotUrl = finalProofUrl;
     depositReq.processedAt = new Date();
     await depositReq.save();
 
-    // Record Financial Audit Transaction
+    // Record Immutable Financial Audit Transaction Ledger
     await WalletTransaction.create({
       userId: user._id.toString(),
       userEmail: user.email,
       type: 'DEPOSIT',
-      amount: depositReq.amount,
+      amount: creditAmount,
       balanceAfter: user.walletBalance,
       referenceId: depositReq._id.toString(),
-      description: `UPI Deposit Approved (UTR: ${depositReq.utr})`,
+      description: `Verified Deposit Credit (UTR: ${depositReq.utr})`,
       proofScreenshotUrl: depositReq.paymentScreenshotUrl || finalProofUrl,
     });
 
+    // Referral Bonus: Credit ₹50 to referrer if this is the user's first approved deposit
+    if (user.referredBy) {
+      const priorApprovedDeposits = await DepositRequest.countDocuments({
+        userId: user._id,
+        status: 'APPROVED',
+      });
+      if (priorApprovedDeposits === 1) {
+        const referrer = await User.findById(user.referredBy);
+        if (referrer) {
+          referrer.walletBalance = Math.round(((referrer.walletBalance || 0) + 50) * 100) / 100;
+          referrer.referralEarnings = (referrer.referralEarnings || 0) + 50;
+          await referrer.save();
+
+          await WalletTransaction.create({
+            userId: referrer._id.toString(),
+            userEmail: referrer.email,
+            type: 'DEPOSIT',
+            amount: 50,
+            balanceAfter: referrer.walletBalance,
+            referenceId: user._id.toString(),
+            description: `Referral Reward Bonus (Referred player ${user.name} made first deposit)`,
+          });
+        }
+      }
+    }
+
     return res.json({
       success: true,
-      message: `Successfully APPROVED deposit of ₹${depositReq.amount} for ${user.name} (${user.email}).`,
+      message: `Deposit APPROVED! Credited ₹${creditAmount} to ${user.name} (${user.email}).`,
       depositRequest: depositReq,
       updatedUserBalance: user.walletBalance,
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message || 'Approval failed' });
+    return res.status(500).json({ success: false, message: error.message || 'Deposit approval failed' });
   }
 };
 
-// @desc    Reject UTR Deposit Request
+// @desc    Reject Deposit Request (Single Record Lifecycle)
 // @route   POST /api/admin/deposits/reject
 export const rejectDeposit = async (req: Request, res: Response) => {
   try {
-    const { requestId, reason } = req.body;
-    if (!requestId) return res.status(400).json({ success: false, message: 'Request ID is required' });
+    const { requestId, reason, remarks } = req.body;
+    if (!requestId) return res.status(400).json({ success: false, message: 'Deposit Request ID is required' });
 
     const depositReq = await DepositRequest.findById(requestId);
-    if (!depositReq) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (!depositReq) return res.status(404).json({ success: false, message: 'Deposit request record not found' });
 
-    if (depositReq.status !== 'PENDING') {
+    if (depositReq.status !== 'PENDING' && depositReq.status !== 'UNDER_REVIEW') {
       return res.status(400).json({ success: false, message: `Request is already ${depositReq.status}` });
     }
 
+    const rejectionMsg = reason || remarks || 'Invalid UTR / Payment Verification Failed';
+
     depositReq.status = 'REJECTED';
-    depositReq.rejectionReason = reason || 'Invalid UTR / Payment Screenshot Verification Failed';
+    depositReq.approvedBy = (req as any).user?.email || 'Admin Portal';
+    depositReq.approvalTime = new Date();
+    depositReq.rejectionReason = rejectionMsg;
+    depositReq.remarks = rejectionMsg;
+    depositReq.adminNote = rejectionMsg;
     depositReq.processedAt = new Date();
     await depositReq.save();
 
-    return res.json({ success: true, message: `Deposit REJECTED for UTR ${depositReq.utr}`, depositRequest: depositReq });
+    return res.json({
+      success: true,
+      message: `Deposit REJECTED for UTR ${depositReq.utr}`,
+      depositRequest: depositReq,
+    });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message || 'Rejection failed' });
   }
@@ -198,123 +233,148 @@ export const rejectDeposit = async (req: Request, res: Response) => {
 export const approveWithdrawal = async (req: Request, res: Response) => {
   try {
     const { requestId, adminPayoutScreenshotUrl, adminPayoutUtr, adminNote } = req.body;
-    if (!requestId) return res.status(400).json({ success: false, message: 'Request ID is required' });
+    if (!requestId) return res.status(400).json({ success: false, message: 'Withdrawal Request ID is required' });
 
-    const withdrawReq = await WithdrawalRequest.findById(requestId);
-    if (!withdrawReq) return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    const withdrawalReq = await WithdrawalRequest.findById(requestId);
+    if (!withdrawalReq) return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
 
-    if (withdrawReq.status !== 'PENDING') {
-      return res.status(400).json({ success: false, message: `Withdrawal request is already ${withdrawReq.status}` });
+    if (withdrawalReq.status !== 'PENDING' && withdrawalReq.status !== 'PROCESSING') {
+      return res.status(400).json({ success: false, message: `Withdrawal request is already ${withdrawalReq.status}` });
     }
 
-    const user = await User.findById(withdrawReq.userId);
-
-    // Upload Admin Payout Screenshot to Cloudinary if provided
-    let finalPayoutProofUrl = '';
+    let finalProofUrl = '';
     if (adminPayoutScreenshotUrl) {
-      finalPayoutProofUrl = await uploadImageToCloudinary(adminPayoutScreenshotUrl, 'baazi_admin_payouts');
+      finalProofUrl = await uploadImageToCloudinary(adminPayoutScreenshotUrl, 'baazi_payout_proofs');
     }
 
-    withdrawReq.status = 'APPROVED';
-    withdrawReq.adminPayoutScreenshotUrl = finalPayoutProofUrl;
-    withdrawReq.adminPayoutUtr = adminPayoutUtr || `BANK_PAYOUT_${Date.now()}`;
-    withdrawReq.adminNote = adminNote || 'Paid to User Bank Account via UPI';
-    withdrawReq.processedAt = new Date();
-    await withdrawReq.save();
+    withdrawalReq.status = 'APPROVED';
+    withdrawalReq.adminPayoutScreenshotUrl = finalProofUrl;
+    withdrawalReq.adminPayoutUtr = adminPayoutUtr || 'PAYOUT_REF_' + Date.now();
+    withdrawalReq.adminNote = adminNote || 'Payout Transferred & Verified';
+    withdrawalReq.processedAt = new Date();
+    await withdrawalReq.save();
 
-    // Record Financial Audit Transaction
-    if (user) {
-      await WalletTransaction.create({
-        userId: user._id.toString(),
-        userEmail: user.email,
-        type: 'WITHDRAWAL_APPROVED',
-        amount: 0, // Balance was already debited at request time
-        balanceAfter: user.walletBalance,
-        referenceId: withdrawReq._id.toString(),
-        description: `Withdrawal Approved & Paid by Admin (Bank UTR: ${withdrawReq.adminPayoutUtr})`,
-        proofScreenshotUrl: finalPayoutProofUrl,
-      });
-    }
+    await WalletTransaction.create({
+      userId: withdrawalReq.userId.toString(),
+      userEmail: withdrawalReq.userEmail,
+      type: 'WITHDRAWAL_APPROVED',
+      amount: withdrawalReq.amount,
+      balanceAfter: 0, // Recorded in ledger
+      referenceId: withdrawalReq._id.toString(),
+      description: `Withdrawal Payout Processed (Ref: ${withdrawalReq.adminPayoutUtr})`,
+      proofScreenshotUrl: finalProofUrl,
+    });
 
     return res.json({
       success: true,
-      message: `Withdrawal of ₹${withdrawReq.amount} for ${withdrawReq.userName} APPROVED & Payout Screenshot Uploaded!`,
-      withdrawalRequest: withdrawReq,
+      message: `Withdrawal payout of ₹${withdrawalReq.amount} APPROVED and marked completed!`,
+      withdrawalRequest: withdrawalReq,
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message || 'Withdrawal approval failed' });
   }
 };
 
-// @desc    Reject Withdrawal Request & Refund Locked Money Back to User Wallet
+// @desc    Reject Withdrawal Request & Refund Balance to User Wallet
 // @route   POST /api/admin/withdrawals/reject
 export const rejectWithdrawal = async (req: Request, res: Response) => {
   try {
     const { requestId, reason } = req.body;
-    if (!requestId) return res.status(400).json({ success: false, message: 'Request ID is required' });
+    if (!requestId) return res.status(400).json({ success: false, message: 'Withdrawal Request ID is required' });
 
-    const withdrawReq = await WithdrawalRequest.findById(requestId);
-    if (!withdrawReq) return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    const withdrawalReq = await WithdrawalRequest.findById(requestId);
+    if (!withdrawalReq) return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
 
-    if (withdrawReq.status !== 'PENDING') {
-      return res.status(400).json({ success: false, message: `Withdrawal request is already ${withdrawReq.status}` });
+    if (withdrawalReq.status !== 'PENDING' && withdrawalReq.status !== 'PROCESSING') {
+      return res.status(400).json({ success: false, message: `Withdrawal request is already ${withdrawalReq.status}` });
     }
 
-    const user = await User.findById(withdrawReq.userId);
+    const user = await User.findById(withdrawalReq.userId);
     if (user) {
-      // Refund locked money back to user wallet
-      user.walletBalance = Math.round(((user.walletBalance || 0) + withdrawReq.amount) * 100) / 100;
+      user.walletBalance = Math.round(((user.walletBalance || 0) + withdrawalReq.amount) * 100) / 100;
       await user.save();
 
-      // Record Financial Audit Transaction
       await WalletTransaction.create({
         userId: user._id.toString(),
         userEmail: user.email,
         type: 'WITHDRAWAL_REJECTED',
-        amount: withdrawReq.amount,
+        amount: withdrawalReq.amount,
         balanceAfter: user.walletBalance,
-        referenceId: withdrawReq._id.toString(),
-        description: `Withdrawal Refund (Reason: ${reason || 'Rejected by Admin'})`,
+        referenceId: withdrawalReq._id.toString(),
+        description: `Withdrawal Rejected & Refunded (+₹${withdrawalReq.amount})`,
       });
     }
 
-    withdrawReq.status = 'REJECTED';
-    withdrawReq.rejectionReason = reason || 'UPI details invalid or rejected by Admin';
-    withdrawReq.processedAt = new Date();
-    await withdrawReq.save();
+    withdrawalReq.status = 'REJECTED';
+    withdrawalReq.rejectionReason = reason || 'UPI / Bank Payout Details Invalid';
+    withdrawalReq.processedAt = new Date();
+    await withdrawalReq.save();
 
     return res.json({
       success: true,
-      message: `Withdrawal request REJECTED. ₹${withdrawReq.amount} refunded back to user wallet.`,
-      withdrawalRequest: withdrawReq,
+      message: `Withdrawal REJECTED & ₹${withdrawalReq.amount} refunded to user wallet`,
+      withdrawalRequest: withdrawalReq,
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message || 'Withdrawal rejection failed' });
   }
 };
 
-// @desc    Get Admin Config (QR, UPI ID, Bank details)
+export const getOrCreateAdminSettings = async () => {
+  let settings = await AdminSettings.findOne({});
+  if (!settings) {
+    settings = await AdminSettings.create({
+      qrCodeUrl: '/images/payment_qr.jpg',
+      upiId: 'baaziboard@paytm',
+      upiHolderName: 'Baazi Board Official',
+      bankName: 'HDFC Bank',
+      accountNumber: '50100234567890',
+      ifscCode: 'HDFC0001234',
+      minDeposit: 100,
+      minWithdrawal: 200,
+      adminPasscode: 'admin123',
+    });
+  }
+  return settings;
+};
+
+// @desc    Get Admin Config Settings
 // @route   GET /api/admin/config
 export const getAdminConfig = async (req: Request, res: Response) => {
   try {
     const settings = await getOrCreateAdminSettings();
     return res.json({ success: true, settings });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch admin settings' });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch settings' });
   }
 };
 
-// @desc    Update Admin Config (QR Code image, UPI ID, Bank details)
+// @desc    Update Admin Config Settings
 // @route   POST /api/admin/config
 export const updateAdminConfig = async (req: Request, res: Response) => {
   try {
-    const { qrCodeUrl, upiId, upiHolderName, bankName, accountNumber, ifscCode, minDeposit, minWithdrawal, adminPasscode, isQrEnabled, isBankEnabled } = req.body;
-    let settings = await getOrCreateAdminSettings();
+    const {
+      qrCodeUrl,
+      upiId,
+      upiHolderName,
+      bankName,
+      accountNumber,
+      ifscCode,
+      minDeposit,
+      minWithdrawal,
+      adminPasscode,
+      isQrEnabled,
+      isBankEnabled,
+    } = req.body;
 
-    if (qrCodeUrl !== undefined) {
-      if (typeof qrCodeUrl === 'string' && qrCodeUrl.startsWith('data:image/')) {
-        const cloudinaryResUrl = await uploadImageToCloudinary(qrCodeUrl, 'baazi_payment_qrs');
-        settings.qrCodeUrl = cloudinaryResUrl;
+    let settings = await AdminSettings.findOne({});
+    if (!settings) {
+      settings = new AdminSettings();
+    }
+
+    if (qrCodeUrl !== undefined && qrCodeUrl.trim() !== '') {
+      if (qrCodeUrl.startsWith('data:image')) {
+        settings.qrCodeUrl = await uploadImageToCloudinary(qrCodeUrl, 'baazi_admin_qr');
       } else {
         settings.qrCodeUrl = qrCodeUrl;
       }
@@ -347,15 +407,15 @@ export const getAdminStats = async (req: Request, res: Response) => {
     const deposits = await DepositRequest.find({ status: 'APPROVED' });
     const withdrawals = await WithdrawalRequest.find({ status: 'APPROVED' });
     const pendingWithdrawals = await WithdrawalRequest.find({ status: 'PENDING' });
+    const pendingDeposits = await DepositRequest.find({ status: { $in: ['PENDING', 'UNDER_REVIEW'] } });
 
-    const totalRealDeposits = deposits.reduce((sum, d) => sum + d.amount, 0);
+    const totalRealDeposits = deposits.reduce((sum, d) => sum + (d.approvedAmount || d.amount), 0);
     const totalRealWithdrawals = withdrawals.reduce((sum, w) => sum + w.amount, 0);
     const pendingWithdrawalAmount = pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0);
 
     const gameLogs = await GameLog.find({ playMode: 'REAL' });
     const totalAdminCommission = gameLogs.reduce((sum, g) => sum + (g.adminCommission || 0), 0);
 
-    // SLA Compliance metric
     const now = Date.now();
     const slaBreachesCount = pendingWithdrawals.filter((w) => new Date(w.slaDeadline).getTime() < now).length;
 
@@ -367,6 +427,7 @@ export const getAdminStats = async (req: Request, res: Response) => {
         totalRealWithdrawals,
         pendingWithdrawalAmount,
         totalAdminCommission,
+        pendingCount: pendingDeposits.length,
         pendingWithdrawalsCount: pendingWithdrawals.length,
         slaBreachesCount,
       },
@@ -387,7 +448,7 @@ export const getAdminUsers = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Adjust User Balance (Credit/Debit Real or Demo balance manually)
+// @desc    Adjust User Balance (STRICT RULE: Direct Real Money addition disabled; requires verified deposit request)
 // @route   POST /api/admin/users/adjust-balance
 export const adminAdjustBalance = async (req: Request, res: Response) => {
   try {
@@ -396,7 +457,17 @@ export const adminAdjustBalance = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const cleanDelta = Number(delta);
+
     if (type === 'REAL') {
+      if (cleanDelta > 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Direct manual credit of real cash is disabled for security & audit transparency. All wallet credits MUST originate from an approved user deposit request.',
+        });
+      }
+
+      // Allow negative balance correction/deduction if needed
       user.walletBalance = Math.max(0, Math.round(((user.walletBalance || 0) + cleanDelta) * 100) / 100);
       await WalletTransaction.create({
         userId: user._id.toString(),
@@ -404,7 +475,7 @@ export const adminAdjustBalance = async (req: Request, res: Response) => {
         type: 'ADMIN_ADJUST',
         amount: cleanDelta,
         balanceAfter: user.walletBalance,
-        description: `Admin Manual Balance Adjustment (${cleanDelta >= 0 ? '+' : ''}${cleanDelta})`,
+        description: `Admin Manual Balance Correction (${cleanDelta})`,
       });
     } else {
       user.demoBalance = Math.max(0, (user.demoBalance || 0) + cleanDelta);

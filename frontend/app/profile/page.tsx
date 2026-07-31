@@ -14,7 +14,7 @@ import { AddMoneyModal } from '../../components/AddMoneyModal';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ProfilePage() {
-  const { user, fetchMatchHistory, updateName } = useAuth();
+  const { user, fetchMatchHistory, updateName, setWithdrawalPin } = useAuth();
   const [selectedGameSlug, setSelectedGameSlug] = useState<string>('all');
   const [isAddMoneyOpen, setIsAddMoneyOpen] = useState<boolean>(false);
   
@@ -22,6 +22,11 @@ export default function ProfilePage() {
   const [editingName, setEditingName] = useState<string>('');
   const [isSavingName, setIsSavingName] = useState<boolean>(false);
   const [nameMsg, setNameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 4-Digit Security PIN State
+  const [pinInput, setPinInput] = useState<string>('');
+  const [isSavingPin, setIsSavingPin] = useState<boolean>(false);
+  const [pinMsg, setPinMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [stats, setStats] = useState<GameStats>({
     totalMatches: 0,
@@ -66,6 +71,26 @@ export default function ProfilePage() {
       setNameMsg({ type: 'error', text: err.message || 'Failed to update name' });
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  const handleSavePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinInput || !/^\d{4}$/.test(pinInput.trim())) {
+      setPinMsg({ type: 'error', text: 'Please enter a 4-digit numeric Security PIN (e.g. 1234)' });
+      return;
+    }
+    setIsSavingPin(true);
+    setPinMsg(null);
+    try {
+      const res = await setWithdrawalPin(pinInput.trim());
+      setPinMsg({ type: 'success', text: res.message || '4-Digit Withdrawal Security PIN saved!' });
+      setPinInput('');
+      setTimeout(() => setPinMsg(null), 3000);
+    } catch (err: any) {
+      setPinMsg({ type: 'error', text: err.message || 'Failed to set Security PIN' });
+    } finally {
+      setIsSavingPin(false);
     }
   };
 
@@ -193,6 +218,47 @@ export default function ProfilePage() {
               </button>
             </form>
           </div>
+        </div>
+
+        {/* 4-Digit Withdrawal Security PIN Setup Panel */}
+        <div className="glass-panel rounded-3xl p-6 border border-slate-800 bg-[#0a0f1d] text-white">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-lg font-black text-white font-['Space_Grotesk']">
+                  4-Digit Withdrawal Security PIN
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Protect your account against unauthorized payout requests by requiring a secret 4-digit PIN for withdrawals.
+              </p>
+            </div>
+
+            <form onSubmit={handleSavePin} className="flex items-center space-x-2 w-full sm:w-auto">
+              <input
+                type="password"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="4-Digit PIN"
+                className="w-28 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold text-center text-sm focus:border-emerald-500 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isSavingPin}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md transition-all shrink-0"
+              >
+                {isSavingPin ? 'Saving...' : 'Set PIN 🔐'}
+              </button>
+            </form>
+          </div>
+
+          {pinMsg && (
+            <p className={`text-xs font-bold mt-2 ${pinMsg.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {pinMsg.text}
+            </p>
+          )}
         </div>
 
         {/* Game Filter Selector Tabs */}

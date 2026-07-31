@@ -7,6 +7,7 @@ import {
   getMe,
   updateCoins,
   updateName,
+  setWithdrawalPin,
   requestEmailChange,
   verifyEmailChange,
   googleOAuthLogin,
@@ -26,10 +27,11 @@ router.post('/login', login);
 router.post('/send-otp', sendOTP);
 router.post('/verify-otp', verifyOTP);
 
-// Protected Profile & OTP Management Routes
+// Protected Profile & Security PIN Routes
 router.get('/me', protect, getMe);
 router.post('/update-coins', protect, updateCoins);
 router.post('/update-name', protect, updateName);
+router.post('/set-withdrawal-pin', protect, setWithdrawalPin);
 router.post('/request-email-change', protect, requestEmailChange);
 router.post('/verify-email-change', protect, verifyEmailChange);
 

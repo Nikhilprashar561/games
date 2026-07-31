@@ -48,8 +48,20 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Minimum deposit amount is ₹10' });
     }
 
-    if (!cleanUtr || cleanUtr.length < 6) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid 12-digit UTR / Reference ID' });
+    if (!cleanUtr || cleanUtr.length < 6 || !/^[A-Z0-9]+$/.test(cleanUtr)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 12-digit UTR / Reference ID containing numbers and letters only' });
+    }
+
+    // Check if user submitted another deposit in the last 15 seconds (Anti-spam rate limit)
+    const recentDeposit = await DepositRequest.findOne({
+      userId,
+      createdAt: { $gte: new Date(Date.now() - 15000) },
+    });
+    if (recentDeposit) {
+      return res.status(429).json({
+        success: false,
+        message: 'A deposit request was submitted just now. Please wait 15 seconds before submitting another request.',
+      });
     }
 
     // Check if UTR was already submitted
@@ -127,7 +139,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
 export const submitWithdrawal = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { amount, upiOrBankDetails, userQrCodeUrl } = req.body;
+    const { amount, upiOrBankDetails, userQrCodeUrl, securityPin } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Not authorized' });
@@ -145,6 +157,13 @@ export const submitWithdrawal = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User profile not found' });
+    }
+
+    // 4-Digit Security PIN Verification if set by user
+    if (user.withdrawalPin && user.withdrawalPin.trim() !== '') {
+      if (!securityPin || securityPin.toString().trim() !== user.withdrawalPin) {
+        return res.status(400).json({ success: false, message: 'Invalid 4-Digit Withdrawal Security PIN. Please enter your correct PIN.' });
+      }
     }
 
     if ((user.walletBalance || 0) < cleanAmount) {

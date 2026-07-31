@@ -283,6 +283,34 @@ export const updateName = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// @desc    Set or Update 4-Digit Security PIN for Withdrawals
+// @route   POST /api/auth/set-withdrawal-pin
+export const setWithdrawalPin = async (req: AuthRequest, res: Response) => {
+  try {
+    const { pin } = req.body;
+    if (!req.user || !pin || !/^\d{4}$/.test(String(pin).trim())) {
+      return res.status(400).json({ message: 'Please enter a valid 4-digit numeric Security PIN' });
+    }
+
+    const cleanPin = String(pin).trim();
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.withdrawalPin = cleanPin;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: '4-Digit Withdrawal Security PIN saved successfully! 🔐',
+      hasPin: true,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message || 'Failed to update PIN' });
+  }
+};
+
 // @desc    Request Email Change OTP
 // @route   POST /api/auth/request-email-change
 export const requestEmailChange = async (req: AuthRequest, res: Response) => {
@@ -420,17 +448,25 @@ export const updateWallet = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Invalid payload' });
     }
 
+    // STRICT SECURITY GUARD: Block arbitrary positive cash additions
+    if (delta > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Direct wallet credit is disabled for financial audit security. All wallet credits must originate from an approved deposit request.',
+      });
+    }
+
     try {
       const user = await User.findById(req.user.id);
       if (user) {
-        user.walletBalance = Math.max(0, (user.walletBalance || 0) + delta);
+        user.walletBalance = Math.max(0, Math.round(((user.walletBalance || 0) + delta) * 100) / 100);
         await user.save();
         return res.json({ success: true, walletBalance: user.walletBalance });
       }
     } catch (dbErr) {
       for (const [email, u] of fallbackUsers.entries()) {
         if (u.id === req.user.id || u.email === req.user.email) {
-          u.walletBalance = Math.max(0, (u.walletBalance || 0) + delta);
+          u.walletBalance = Math.max(0, Math.round(((u.walletBalance || 0) + delta) * 100) / 100);
           fallbackUsers.set(email, u);
           return res.json({ success: true, walletBalance: u.walletBalance });
         }
@@ -443,7 +479,25 @@ export const updateWallet = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateCoins = updateWallet;
+export const updateCoins = async (req: AuthRequest, res: Response) => {
+  try {
+    const { delta } = req.body;
+    if (!req.user || typeof delta !== 'number') {
+      return res.status(400).json({ message: 'Invalid payload' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (user) {
+      user.demoBalance = Math.max(0, (user.demoBalance || 0) + delta);
+      await user.save();
+      return res.json({ success: true, demoBalance: user.demoBalance });
+    }
+
+    return res.status(404).json({ message: 'User not found' });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+};
 
 // ---------- GOOGLE OAUTH 2.0 & 7-DAY JWT CONTROLLER ----------
 import { OAuth2Client } from 'google-auth-library';

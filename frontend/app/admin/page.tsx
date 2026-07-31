@@ -232,6 +232,14 @@ export default function AdminPage() {
   };
 
   const handleAdjustBalance = async (userId: string, type: 'REAL' | 'DEMO', delta: number) => {
+    if (type === 'REAL' && delta > 0) {
+      setActionFeedback({
+        type: 'error',
+        message: '🔒 Direct manual credit of real cash is disabled for security & audit transparency. All wallet credits MUST originate from an approved user deposit request.',
+      });
+      return;
+    }
+
     setActionFeedback(null);
     try {
       const res = await adminAdjustUserBalance(userId, type, delta);
@@ -272,6 +280,37 @@ export default function AdminPage() {
     } catch (err: any) {
       setActionFeedback({ type: 'error', message: err.message || 'Failed to reset all wallets' });
     }
+  };
+
+  const exportGameLogsCSV = () => {
+    if (!gameLogs || gameLogs.length === 0) {
+      setActionFeedback({ type: 'error', message: 'No game logs available to export' });
+      return;
+    }
+    const headers = ['Match ID', 'User Email', 'Game', 'Play Mode', 'Entry Fee (INR)', 'Result', 'Match Outcome', 'Amount Won (INR)', 'Admin Commission (INR)', 'Net Earnings (INR)', 'Opponent', 'Played Date'];
+    const rows = gameLogs.map((l) => [
+      l.id || l._id,
+      l.userEmail,
+      l.gameTitle || l.gameSlug,
+      l.playMode,
+      l.entryFee,
+      l.result,
+      l.matchOutcome || 'NORMAL_FINISH',
+      l.amountWon || 0,
+      l.adminCommission || 0,
+      l.netAmount || 0,
+      `"${l.opponentName || 'Online Player'}"`,
+      `"${new Date(l.playedAt).toLocaleString('en-IN')}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `baazi_game_logs_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setActionFeedback({ type: 'success', message: 'Game logs exported successfully as CSV!' });
   };
 
   // PASSCODE AUTH SCREEN
@@ -759,64 +798,22 @@ export default function AdminPage() {
                         </td>
 
                         <td className="py-4 px-4 text-right">
-                          <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
-                            
-                            {/* Custom Amount Input Box */}
-                            <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                              <span className="text-[11px] font-black text-emerald-400 pl-1">₹</span>
-                              <input
-                                type="number"
-                                placeholder="Amount"
-                                value={customAmounts[u.id || (u as any)._id] || ''}
-                                onChange={(e) => setCustomAmounts({ ...customAmounts, [u.id || (u as any)._id]: e.target.value })}
-                                className="w-20 px-2 py-1 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                              />
+                          <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
+                            <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-bold text-slate-400 inline-flex items-center space-x-1">
+                              <Lock className="w-3 h-3 text-amber-400" />
+                              <span>Requires Verified Deposit Request</span>
+                            </span>
 
-                              <button
-                                onClick={() => {
-                                  const amt = Number(customAmounts[u.id || (u as any)._id]) || 500;
-                                  handleAdjustBalance(u.id || (u as any)._id, 'REAL', amt);
-                                }}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] shadow-sm flex items-center space-x-1"
-                                title="Add custom amount to user's real cash wallet"
-                              >
-                                <PlusCircle className="w-3 h-3" />
-                                <span>+ Add Cash</span>
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  const amt = Number(customAmounts[u.id || (u as any)._id]) || 0;
-                                  handleAdjustBalance(u.id || (u as any)._id, 'SET_REAL_EXACT' as any, amt);
-                                }}
-                                className="px-2 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-extrabold text-[11px]"
-                                title="Set exact wallet balance"
-                              >
-                                Set Exact
-                              </button>
-                            </div>
-
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={() => handleAdjustBalance(u.id || (u as any)._id, 'SET_REAL_ZERO' as any, 0)}
-                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] border border-slate-700"
-                                title="Reset wallet balance to ₹0"
-                              >
-                                Reset ₹0
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  const amt = Number(customAmounts[u.id || (u as any)._id]) || 1000;
-                                  handleAdjustBalance(u.id || (u as any)._id, 'DEMO', amt);
-                                }}
-                                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 font-extrabold text-[11px]"
-                                title="Add demo coins"
-                              >
-                                + 🪙 1,000 Demo
-                              </button>
-                            </div>
-
+                            <button
+                              onClick={() => {
+                                const amt = Number(customAmounts[u.id || (u as any)._id]) || 1000;
+                                handleAdjustBalance(u.id || (u as any)._id, 'DEMO', amt);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 font-extrabold text-[11px] transition-colors"
+                              title="Add demo coins for practice play"
+                            >
+                              + 🪙 1,000 Demo Coins
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1094,13 +1091,23 @@ export default function AdminPage() {
                 Complete audit history of customer game matches, entry fees, winnings, and admin house commission
               </p>
             </div>
-            <button
-              onClick={loadGameLogs}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center space-x-1"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} />
-              <span>Refresh Logs</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={exportGameLogsCSV}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-bold border border-emerald-500/30 flex items-center space-x-1"
+                title="Download complete game logs as CSV spreadsheet"
+              >
+                <span>📥 Export CSV</span>
+              </button>
+
+              <button
+                onClick={loadGameLogs}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center space-x-1"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} />
+                <span>Refresh Logs</span>
+              </button>
+            </div>
           </div>
 
           {/* Revenue Summary Banner */}

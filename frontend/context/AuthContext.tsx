@@ -43,7 +43,8 @@ interface AuthContextType {
 
   // UTR & Deposit API
   submitDepositUTR: (amount: number, utr: string, paymentMethod?: string, paymentScreenshotUrl?: string, paymentTime?: string) => Promise<any>;
-  submitWithdrawal: (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string) => Promise<any>;
+  submitWithdrawal: (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string, securityPin?: string) => Promise<any>;
+  setWithdrawalPin: (pin: string) => Promise<any>;
   fetchMyDeposits: () => Promise<DepositRequest[]>;
   fetchMyWithdrawals: () => Promise<WithdrawalRequest[]>;
   fetchMyTransactions: () => Promise<WalletTransaction[]>;
@@ -53,7 +54,7 @@ interface AuthContextType {
   adminLoginPasscode: (passcode: string) => Promise<boolean>;
   fetchAdminDeposits: (status?: string, search?: string) => Promise<DepositRequest[]>;
   fetchAdminWithdrawals: (status?: string, search?: string) => Promise<WithdrawalRequest[]>;
-  adminApproveDeposit: (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string) => Promise<any>;
+  adminApproveDeposit: (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string, approvedAmount?: number, remarks?: string) => Promise<any>;
   adminRejectDeposit: (requestId: string, reason?: string) => Promise<any>;
   adminApproveWithdrawal: (requestId: string, adminPayoutScreenshotUrl?: string, adminPayoutUtr?: string, adminNote?: string) => Promise<any>;
   adminRejectWithdrawal: (requestId: string, reason?: string) => Promise<any>;
@@ -526,9 +527,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const submitWithdrawal = async (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string) => {
+  const submitWithdrawal = async (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string, securityPin?: string) => {
     try {
-      const res = await axios.post('/api/payment/withdraw', { amount, upiOrBankDetails, userQrCodeUrl });
+      const res = await axios.post('/api/payment/withdraw', { amount, upiOrBankDetails, userQrCodeUrl, securityPin });
       if (res.data.success && user) {
         const updated = { ...user, walletBalance: res.data.newWalletBalance };
         setUser(updated);
@@ -537,6 +538,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return res.data;
     } catch (err: any) {
       throw new Error(err.response?.data?.message || 'Failed to submit withdrawal request');
+    }
+  };
+
+  const setWithdrawalPin = async (pin: string) => {
+    try {
+      const res = await axios.post('/api/auth/set-withdrawal-pin', { pin });
+      if (res.data.success && user) {
+        const updated = { ...user, hasWithdrawalPin: true };
+        setUser(updated);
+        localStorage.setItem('user_session', JSON.stringify(updated));
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to update security PIN');
     }
   };
 
@@ -650,9 +665,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const adminApproveDeposit = async (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string) => {
+  const adminApproveDeposit = async (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string, approvedAmount?: number, remarks?: string) => {
     try {
-      const res = await axios.post('/api/admin/deposits/approve', { requestId, adminNote, adminProofScreenshotUrl });
+      const res = await axios.post('/api/admin/deposits/approve', { requestId, adminNote, adminProofScreenshotUrl, approvedAmount, remarks });
       if (res.data.success && user && res.data.depositRequest?.userId === user.id) {
         const updated = { ...user, walletBalance: res.data.updatedUserBalance };
         setUser(updated);
@@ -810,6 +825,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         openRazorpayCheckout,
         submitDepositUTR,
         submitWithdrawal,
+        setWithdrawalPin,
         fetchMyDeposits,
         fetchMyWithdrawals,
         fetchMyTransactions,

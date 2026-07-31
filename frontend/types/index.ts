@@ -8,6 +8,8 @@ export interface User {
   upiId: string;
   avatar: string;
   isVerified?: boolean;
+  hasWithdrawalPin?: boolean;
+  referralCode?: string;
 }
 
 export interface GameInfo {
@@ -57,6 +59,7 @@ export interface DepositRequest {
   userEmail: string;
   userName: string;
   amount: number;
+  approvedAmount?: number;
   utr: string;
   type: 'DEPOSIT' | 'WITHDRAWAL';
   paymentMethod: string;
@@ -65,7 +68,10 @@ export interface DepositRequest {
   paymentTime?: string;
   adminProofScreenshotUrl?: string;
   adminNote?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  remarks?: string;
+  status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+  approvedBy?: string;
+  approvalTime?: string;
   rejectionReason?: string;
   createdAt: string;
   processedAt?: string;

@@ -9,6 +9,10 @@ export interface IUser extends Document {
   upiId: string;
   avatar: string;
   isVerified: boolean;
+  withdrawalPin?: string; // 4-Digit Withdrawal Security PIN
+  referralCode?: string; // Unique referral code (e.g. BAAZI-X92F)
+  referredBy?: string; // Referrer user ID if signed up via referral link
+  referralEarnings?: number; // Total referral earnings in ₹
   googleId?: string;
   isGoogleVerified?: boolean;
   lastLoginAt?: Date;
@@ -36,11 +40,11 @@ const UserSchema: Schema = new Schema({
   },
   walletBalance: {
     type: Number,
-    default: 0, // Default real money balance
+    default: 0,
   },
   demoBalance: {
     type: Number,
-    default: 1000, // 1,000 Demo Coins on Registration
+    default: 1000,
   },
   role: {
     type: String,
@@ -58,6 +62,23 @@ const UserSchema: Schema = new Schema({
   isVerified: {
     type: Boolean,
     default: false,
+  },
+  withdrawalPin: {
+    type: String,
+    default: '',
+  },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  referredBy: {
+    type: String,
+    default: '',
+  },
+  referralEarnings: {
+    type: Number,
+    default: 0,
   },
   googleId: {
     type: String,

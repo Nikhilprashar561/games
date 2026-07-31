@@ -65,6 +65,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
   const [withdrawAmount, setWithdrawAmount] = useState<string>('200');
   const [withdrawDetails, setWithdrawDetails] = useState<string>('');
   const [withdrawQrCode, setWithdrawQrCode] = useState<string>('');
+  const [securityPin, setSecurityPin] = useState<string>('');
 
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
@@ -226,10 +227,11 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
 
     setSubmitting(true);
     try {
-      const res = await submitWithdrawal(numAmt, withdrawDetails.trim(), withdrawQrCode);
+      const res = await submitWithdrawal(numAmt, withdrawDetails.trim(), withdrawQrCode, securityPin);
       setFeedback({ type: 'success', message: res.message });
       setWithdrawAmount('200');
       setWithdrawQrCode('');
+      setSecurityPin('');
       loadAllHistories();
       setTimeout(() => {
         setActiveTab('STATUS');
@@ -492,6 +494,19 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                     className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-white font-mono font-bold text-sm focus:border-emerald-500 outline-none"
                     required
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">4-Digit Security PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={securityPin}
+                    onChange={(e) => setSecurityPin(e.target.value)}
+                    placeholder="Enter 4-Digit Security PIN (e.g. 1234)"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-white font-mono font-bold text-sm focus:border-emerald-500 outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500">Required if you set a Security PIN in your Profile settings</p>
                 </div>
 
                 <div className="space-y-2">
