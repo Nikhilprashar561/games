@@ -1,9 +1,11 @@
 import { Response } from 'express';
 import User from '../models/User';
 import DepositRequest from '../models/DepositRequest';
-import AdminSettings from '../models/AdminSettings';
+import WithdrawalRequest from '../models/WithdrawalRequest';
+import WalletTransaction from '../models/WalletTransaction';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { getOrCreateAdminSettings } from './adminController';
+import { uploadImageToCloudinary } from '../utils/cloudinary';
 
 // @desc    Get Active Admin QR Code, UPI ID & Bank Details for User Payment
 // @route   GET /api/payment/config
@@ -28,12 +30,12 @@ export const getPublicPaymentConfig = async (req: AuthRequest, res: Response) =>
   }
 };
 
-// @desc    Submit UTR / Transaction Reference ID for QR / UPI Deposit Verification
+// @desc    Submit UTR / Transaction Reference ID & Payment Screenshot for Deposit Verification
 // @route   POST /api/payment/deposit
 export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { amount, utr, paymentMethod } = req.body;
+    const { amount, utr, paymentMethod, paymentScreenshotUrl, paymentTime } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Not authorized' });
@@ -50,7 +52,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Please enter a valid 12-digit UTR / Reference ID' });
     }
 
-    // Check if this UTR has already been submitted
+    // Check if UTR was already submitted
     const existingReq = await DepositRequest.findOne({ utr: cleanUtr });
     if (existingReq) {
       return res.status(400).json({
@@ -64,17 +66,32 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'User profile not found' });
     }
 
-    // Auto-Verify Check: Instant approval for valid auto-verify UTR formats or webhook triggers
-    const isAutoVerifiable = cleanUtr.startsWith('VERIFY') || cleanUtr.startsWith('AUTO') || cleanUtr.startsWith('TEST') || cleanUtr.length === 12;
+    // Upload Payment Screenshot to Cloudinary if provided
+    let finalScreenshotUrl = '';
+    if (paymentScreenshotUrl) {
+      finalScreenshotUrl = await uploadImageToCloudinary(paymentScreenshotUrl, 'baazi_user_deposits');
+    }
 
+    const isAutoVerifiable = cleanUtr.startsWith('VERIFY') || cleanUtr.startsWith('AUTO') || cleanUtr.startsWith('TEST');
     let initialStatus: 'PENDING' | 'APPROVED' = 'PENDING';
-    let autoNote = 'Submitted for verification';
+    let autoNote = 'Submitted for Admin Screenshot Verification';
 
     if (isAutoVerifiable) {
       initialStatus = 'APPROVED';
       autoNote = 'Instant Auto-Verified & Credited';
       user.walletBalance = Math.round(((user.walletBalance || 0) + cleanAmount) * 100) / 100;
       await user.save();
+
+      // Record Financial Audit Transaction
+      await WalletTransaction.create({
+        userId: user._id.toString(),
+        userEmail: user.email,
+        type: 'DEPOSIT',
+        amount: cleanAmount,
+        balanceAfter: user.walletBalance,
+        description: `Auto-Verified UPI Deposit (UTR: ${cleanUtr})`,
+        proofScreenshotUrl: finalScreenshotUrl,
+      });
     }
 
     const depositReq = await DepositRequest.create({
@@ -85,6 +102,8 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       utr: cleanUtr,
       type: 'DEPOSIT',
       paymentMethod: paymentMethod || 'UPI_QR',
+      paymentScreenshotUrl: finalScreenshotUrl,
+      paymentTime: paymentTime ? new Date(paymentTime) : new Date(),
       status: initialStatus,
       rejectionReason: autoNote,
       processedAt: initialStatus === 'APPROVED' ? new Date() : undefined,
@@ -93,8 +112,8 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
     return res.json({
       success: true,
       message: initialStatus === 'APPROVED'
-        ? `⚡ Instant Verification Success! ₹${cleanAmount} has been credited to your real cash wallet balance!`
-        : `Deposit request for ₹${cleanAmount} (UTR: ${cleanUtr}) submitted successfully! Verification in progress.`,
+        ? `⚡ Instant Verification Success! ₹${cleanAmount} has been credited to your wallet!`
+        : `Deposit request for ₹${cleanAmount} (UTR: ${cleanUtr}) submitted with payment proof! Admin verification in progress.`,
       depositRequest: depositReq,
       updatedBalance: user.walletBalance,
     });
@@ -103,12 +122,12 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// @desc    Submit Real Money Withdrawal Request
+// @desc    Submit Real Money Withdrawal Request with 4-Hour SLA Countdown
 // @route   POST /api/payment/withdraw
 export const submitWithdrawal = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { amount, upiOrBankDetails } = req.body;
+    const { amount, upiOrBankDetails, userQrCodeUrl } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Not authorized' });
@@ -135,27 +154,46 @@ export const submitWithdrawal = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Lock/deduct the requested amount from user's real balance
-    user.walletBalance = user.walletBalance - cleanAmount;
+    // Upload User QR Code Screenshot to Cloudinary if provided
+    let finalUserQrUrl = '';
+    if (userQrCodeUrl) {
+      finalUserQrUrl = await uploadImageToCloudinary(userQrCodeUrl, 'baazi_user_qrcodes');
+    }
+
+    // Lock/deduct requested amount from user's real balance (held in escrow)
+    user.walletBalance = Math.round(((user.walletBalance || 0) - cleanAmount) * 100) / 100;
     await user.save();
 
-    const utrCode = `WD_${Date.now()}`;
-    const withdrawReq = await DepositRequest.create({
+    // 4-Hour Strict SLA Deadline Calculation
+    const slaDeadline = new Date(Date.now() + 4 * 3600 * 1000);
+
+    const withdrawReq = await WithdrawalRequest.create({
       userId: user._id,
       userEmail: user.email,
       userName: user.name,
       amount: cleanAmount,
-      utr: utrCode,
-      type: 'WITHDRAWAL',
-      paymentMethod: 'UPI_BANK',
-      upiOrBankDetails: upiOrBankDetails.trim(),
+      upiId: upiOrBankDetails.trim(),
+      userQrCodeUrl: finalUserQrUrl,
       status: 'PENDING',
+      slaDeadline,
+    });
+
+    // Record Financial Audit Transaction
+    await WalletTransaction.create({
+      userId: user._id.toString(),
+      userEmail: user.email,
+      type: 'WITHDRAWAL_REQUEST',
+      amount: -cleanAmount,
+      balanceAfter: user.walletBalance,
+      referenceId: withdrawReq._id.toString(),
+      description: `Withdrawal Request for ₹${cleanAmount} (4-Hour SLA Payout to ${upiOrBankDetails})`,
+      proofScreenshotUrl: finalUserQrUrl,
     });
 
     return res.json({
       success: true,
-      message: `Withdrawal request for ₹${cleanAmount} submitted! Payout will be processed by Admin to ${upiOrBankDetails}.`,
-      depositRequest: withdrawReq,
+      message: `Withdrawal request for ₹${cleanAmount} submitted! Guaranteed payout within 4 Hours SLA deadline.`,
+      withdrawalRequest: withdrawReq,
       newWalletBalance: user.walletBalance,
     });
   } catch (error: any) {
@@ -163,40 +201,52 @@ export const submitWithdrawal = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// @desc    Get Current Logged In User's Deposit & Withdrawal History
+// @desc    Get Logged-in User's Deposit History
 // @route   GET /api/payment/my-deposits
 export const getMyDeposits = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Not authorized' });
-    }
+    if (!userId) return res.status(401).json({ success: false, message: 'Not authorized' });
 
     const requests = await DepositRequest.find({ userId }).sort({ createdAt: -1 });
-
-    return res.json({
-      success: true,
-      count: requests.length,
-      requests,
-    });
+    return res.json({ success: true, count: requests.length, requests });
   } catch (error: any) {
-    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch transaction history' });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch deposits' });
   }
 };
 
-// Legacy Razorpay / direct credit fallback
-export const createOrder = async (req: AuthRequest, res: Response) => {
-  return res.json({
-    success: true,
-    orderId: `order_direct_${Date.now()}`,
-    amount: Math.round((req.body.amount || 100) * 100),
-    currency: 'INR',
-  });
+// @desc    Get Logged-in User's Withdrawal Requests with SLA Countdown Data
+// @route   GET /api/payment/my-withdrawals
+export const getMyWithdrawals = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Not authorized' });
+
+    const requests = await WithdrawalRequest.find({ userId }).sort({ createdAt: -1 });
+    return res.json({ success: true, count: requests.length, requests });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch withdrawals' });
+  }
 };
 
+// @desc    Get Logged-in User's Full Double-Entry Wallet Audit Transactions
+// @route   GET /api/payment/my-transactions
+export const getMyTransactions = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Not authorized' });
+
+    const transactions = await WalletTransaction.find({ userId }).sort({ createdAt: -1 });
+    return res.json({ success: true, count: transactions.length, transactions });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to fetch transactions' });
+  }
+};
+
+// Legacy Fallback methods
+export const createOrder = async (req: AuthRequest, res: Response) => {
+  return res.json({ success: true, orderId: `order_direct_${Date.now()}`, amount: Math.round((req.body.amount || 100) * 100), currency: 'INR' });
+};
 export const verifyPayment = async (req: AuthRequest, res: Response) => {
-  return res.json({
-    success: true,
-    message: 'Direct credit processed',
-  });
+  return res.json({ success: true, message: 'Direct credit processed' });
 };

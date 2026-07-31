@@ -1,32 +1,40 @@
 import express from 'express';
 import {
-  adminLogin,
+  verifyAdminPasscode,
   getDeposits,
+  getWithdrawals,
   approveDeposit,
   rejectDeposit,
+  approveWithdrawal,
+  rejectWithdrawal,
   getAdminConfig,
   updateAdminConfig,
   getAdminStats,
-  getAllUsers,
-  adjustUserBalance,
-  createTestDeposit,
-  resetAllUserWallets,
+  getAdminUsers,
+  adminAdjustBalance,
+  getAdminGameLogs,
 } from '../controllers/adminController';
-import { getAllGameLogs } from '../controllers/gameController';
 
 const router = express.Router();
 
-router.post('/login', adminLogin);
+router.post('/login', verifyAdminPasscode);
+
+// Deposit Routes
 router.get('/deposits', getDeposits);
 router.post('/deposits/approve', approveDeposit);
 router.post('/deposits/reject', rejectDeposit);
-router.post('/deposits/create-test', createTestDeposit);
+
+// Withdrawal Routes (4-Hour SLA Payouts)
+router.get('/withdrawals', getWithdrawals);
+router.post('/withdrawals/approve', approveWithdrawal);
+router.post('/withdrawals/reject', rejectWithdrawal);
+
+// Configuration & Stats Routes
 router.get('/config', getAdminConfig);
 router.post('/config', updateAdminConfig);
 router.get('/stats', getAdminStats);
-router.get('/users', getAllUsers);
-router.get('/game-logs', getAllGameLogs);
-router.post('/users/adjust-balance', adjustUserBalance);
-router.post('/users/reset-all-wallets', resetAllUserWallets);
+router.get('/users', getAdminUsers);
+router.get('/game-logs', getAdminGameLogs);
+router.post('/users/adjust-balance', adminAdjustBalance);
 
 export default router;

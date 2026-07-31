@@ -31,6 +31,8 @@ export interface GameMatchLog {
   gameSlug: string;
   gameTitle: string;
   result: 'WIN' | 'LOSS' | 'DRAW';
+  matchOutcome?: 'NORMAL_FINISH' | 'PLAYER_QUIT' | 'TIMEOUT';
+  quitPlayerId?: string;
   amountSpent: number;
   amountWon: number;
   netAmount: number;
@@ -59,10 +61,47 @@ export interface DepositRequest {
   type: 'DEPOSIT' | 'WITHDRAWAL';
   paymentMethod: string;
   upiOrBankDetails?: string;
+  paymentScreenshotUrl?: string;
+  paymentTime?: string;
+  adminProofScreenshotUrl?: string;
+  adminNote?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
   createdAt: string;
   processedAt?: string;
+}
+
+export interface WithdrawalRequest {
+  _id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  amount: number;
+  upiId: string;
+  userQrCodeUrl?: string;
+  status: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED';
+  slaDeadline: string; // 4-Hour SLA deadline Date ISO string
+  isSlaBreached?: boolean;
+  msRemaining?: number;
+  adminPayoutScreenshotUrl?: string;
+  adminPayoutUtr?: string;
+  rejectionReason?: string;
+  adminNote?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface WalletTransaction {
+  _id: string;
+  userId: string;
+  userEmail: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL_REQUEST' | 'WITHDRAWAL_APPROVED' | 'WITHDRAWAL_REJECTED' | 'GAME_ENTRY' | 'GAME_WIN' | 'ADMIN_ADJUST';
+  amount: number;
+  balanceAfter: number;
+  referenceId?: string;
+  description: string;
+  proofScreenshotUrl?: string;
+  createdAt: string;
 }
 
 export interface AdminSettings {

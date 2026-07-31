@@ -9,6 +9,10 @@ export interface IDepositRequest extends Document {
   type: 'DEPOSIT' | 'WITHDRAWAL';
   paymentMethod: string;
   upiOrBankDetails?: string;
+  paymentScreenshotUrl?: string;     // User payment screenshot (Cloudinary/Base64)
+  paymentTime?: Date;                // Time user completed payment
+  adminProofScreenshotUrl?: string; // Admin verification proof
+  adminNote?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
   createdAt: Date;
@@ -51,6 +55,22 @@ const DepositRequestSchema: Schema = new Schema({
     default: 'UPI_QR',
   },
   upiOrBankDetails: {
+    type: String,
+    default: '',
+  },
+  paymentScreenshotUrl: {
+    type: String,
+    default: '',
+  },
+  paymentTime: {
+    type: Date,
+    default: Date.now,
+  },
+  adminProofScreenshotUrl: {
+    type: String,
+    default: '',
+  },
+  adminNote: {
     type: String,
     default: '',
   },

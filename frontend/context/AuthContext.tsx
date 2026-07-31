@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
-import { User, GameMatchLog, GameStats, DepositRequest, AdminSettings } from '../types';
+import { User, GameMatchLog, GameStats, DepositRequest, WithdrawalRequest, WalletTransaction, AdminSettings } from '../types';
 import { ToastContainer, ToastItem } from '../components/ToastContainer';
 
 export type PlayMode = 'REAL' | 'DEMO';
@@ -37,20 +37,26 @@ interface AuthContextType {
     amountWon: number,
     opponentName?: string
   ) => Promise<void>;
+  quitGameMatch: (gameSlug: string, gameTitle: string, entryFee?: number, opponentName?: string) => Promise<void>;
   fetchMatchHistory: (gameSlug?: string, mode?: 'REAL' | 'DEMO') => Promise<{ stats: GameStats; logs: GameMatchLog[] }>;
   openRazorpayCheckout: (amount: number) => void;
 
   // UTR & Deposit API
-  submitDepositUTR: (amount: number, utr: string, paymentMethod?: string) => Promise<any>;
-  submitWithdrawal: (amount: number, upiOrBankDetails: string) => Promise<any>;
+  submitDepositUTR: (amount: number, utr: string, paymentMethod?: string, paymentScreenshotUrl?: string, paymentTime?: string) => Promise<any>;
+  submitWithdrawal: (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string) => Promise<any>;
   fetchMyDeposits: () => Promise<DepositRequest[]>;
+  fetchMyWithdrawals: () => Promise<WithdrawalRequest[]>;
+  fetchMyTransactions: () => Promise<WalletTransaction[]>;
   fetchPublicPaymentConfig: () => Promise<AdminSettings>;
 
   // Admin APIs
   adminLoginPasscode: (passcode: string) => Promise<boolean>;
   fetchAdminDeposits: (status?: string, search?: string) => Promise<DepositRequest[]>;
-  adminApproveDeposit: (requestId: string, adminNote?: string) => Promise<any>;
+  fetchAdminWithdrawals: (status?: string, search?: string) => Promise<WithdrawalRequest[]>;
+  adminApproveDeposit: (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string) => Promise<any>;
   adminRejectDeposit: (requestId: string, reason?: string) => Promise<any>;
+  adminApproveWithdrawal: (requestId: string, adminPayoutScreenshotUrl?: string, adminPayoutUtr?: string, adminNote?: string) => Promise<any>;
+  adminRejectWithdrawal: (requestId: string, reason?: string) => Promise<any>;
   updateAdminConfig: (configData: Partial<AdminSettings>) => Promise<AdminSettings>;
   fetchAdminStats: () => Promise<any>;
   fetchAdminUsers: () => Promise<User[]>;
@@ -441,6 +447,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const quitGameMatch = async (
+    gameSlug: string,
+    gameTitle: string,
+    entryFee: number = 10,
+    opponentName: string = 'Online Player'
+  ) => {
+    if (!user) return;
+    try {
+      await axios.post('/api/games/quit-match', {
+        gameSlug,
+        gameTitle,
+        playMode,
+        entryFee,
+        opponentName,
+      });
+      setWelcomeToast(`Match Quit! Entry fee ₹${entryFee} forfeited.`);
+      setTimeout(() => setWelcomeToast(null), 3000);
+    } catch (err) {
+      console.error('Quit match logging error:', err);
+    }
+  };
+
   const fetchMatchHistory = async (gameSlug?: string, mode: 'REAL' | 'DEMO' = 'REAL'): Promise<{ stats: GameStats; logs: GameMatchLog[] }> => {
     if (token) {
       try {
@@ -489,18 +517,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // UTR Deposit & Payment APIs
-  const submitDepositUTR = async (amount: number, utr: string, paymentMethod: string = 'UPI_QR') => {
+  const submitDepositUTR = async (amount: number, utr: string, paymentMethod: string = 'UPI_QR', paymentScreenshotUrl?: string, paymentTime?: string) => {
     try {
-      const res = await axios.post('/api/payment/deposit', { amount, utr, paymentMethod });
+      const res = await axios.post('/api/payment/deposit', { amount, utr, paymentMethod, paymentScreenshotUrl, paymentTime });
       return res.data;
     } catch (err: any) {
       throw new Error(err.response?.data?.message || 'Failed to submit deposit UTR');
     }
   };
 
-  const submitWithdrawal = async (amount: number, upiOrBankDetails: string) => {
+  const submitWithdrawal = async (amount: number, upiOrBankDetails: string, userQrCodeUrl?: string) => {
     try {
-      const res = await axios.post('/api/payment/withdraw', { amount, upiOrBankDetails });
+      const res = await axios.post('/api/payment/withdraw', { amount, upiOrBankDetails, userQrCodeUrl });
       if (res.data.success && user) {
         const updated = { ...user, walletBalance: res.data.newWalletBalance };
         setUser(updated);
@@ -517,6 +545,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await axios.get('/api/payment/my-deposits');
       if (res.data.success) {
         return res.data.requests;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const fetchMyWithdrawals = async (): Promise<WithdrawalRequest[]> => {
+    try {
+      const res = await axios.get('/api/payment/my-withdrawals');
+      if (res.data.success) {
+        return res.data.requests;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const fetchMyTransactions = async (): Promise<WalletTransaction[]> => {
+    try {
+      const res = await axios.get('/api/payment/my-transactions');
+      if (res.data.success) {
+        return res.data.transactions;
       }
       return [];
     } catch (err) {
@@ -583,10 +635,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const adminApproveDeposit = async (requestId: string, adminNote?: string) => {
+  const fetchAdminWithdrawals = async (status?: string, search?: string): Promise<WithdrawalRequest[]> => {
     try {
-      const res = await axios.post('/api/admin/deposits/approve', { requestId, adminNote });
-      // If the currently logged in user is the beneficiary, update their balance live
+      let url = '/api/admin/withdrawals?';
+      if (status) url += `status=${encodeURIComponent(status)}&`;
+      if (search) url += `search=${encodeURIComponent(search)}`;
+      const res = await axios.get(url);
+      if (res.data.success) {
+        return res.data.requests;
+      }
+      return [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const adminApproveDeposit = async (requestId: string, adminNote?: string, adminProofScreenshotUrl?: string) => {
+    try {
+      const res = await axios.post('/api/admin/deposits/approve', { requestId, adminNote, adminProofScreenshotUrl });
       if (res.data.success && user && res.data.depositRequest?.userId === user.id) {
         const updated = { ...user, walletBalance: res.data.updatedUserBalance };
         setUser(updated);
@@ -604,6 +670,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return res.data;
     } catch (err: any) {
       throw new Error(err.response?.data?.message || 'Failed to reject request');
+    }
+  };
+
+  const adminApproveWithdrawal = async (requestId: string, adminPayoutScreenshotUrl?: string, adminPayoutUtr?: string, adminNote?: string) => {
+    try {
+      const res = await axios.post('/api/admin/withdrawals/approve', { requestId, adminPayoutScreenshotUrl, adminPayoutUtr, adminNote });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to approve withdrawal payout');
+    }
+  };
+
+  const adminRejectWithdrawal = async (requestId: string, reason?: string) => {
+    try {
+      const res = await axios.post('/api/admin/withdrawals/reject', { requestId, reason });
+      if (res.data.success && user && res.data.withdrawalRequest?.userId === user.id) {
+        fetchUserProfile();
+      }
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Failed to reject withdrawal payout');
     }
   };
 
@@ -718,16 +805,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         requestEmailChange,
         verifyEmailChange,
         recordGameMatch,
+        quitGameMatch,
         fetchMatchHistory,
         openRazorpayCheckout,
         submitDepositUTR,
         submitWithdrawal,
         fetchMyDeposits,
+        fetchMyWithdrawals,
+        fetchMyTransactions,
         fetchPublicPaymentConfig,
         adminLoginPasscode,
         fetchAdminDeposits,
+        fetchAdminWithdrawals,
         adminApproveDeposit,
         adminRejectDeposit,
+        adminApproveWithdrawal,
+        adminRejectWithdrawal,
         updateAdminConfig,
         fetchAdminStats,
         fetchAdminUsers,

@@ -7,12 +7,19 @@ export interface IGameLog extends Document {
   gameSlug: string;
   gameTitle: string;
   playMode: 'REAL' | 'DEMO';
-  entryFee: number;       // Entry fee paid by player (e.g. ₹10)
+  entryFee: number;                  // Entry fee paid by player (e.g. ₹10)
+  walletBalanceBefore: number;       // Balance before match
+  walletBalanceAfter: number;        // Balance after match settlement
   result: 'WIN' | 'LOSS' | 'DRAW';
-  amountWon: number;      // Payout received by player (e.g. ₹18 on WIN, ₹10 on DRAW, ₹0 on LOSS)
-  adminCommission: number;// Commission kept by admin (e.g. ₹2 on WIN, ₹10 on LOSS, ₹0 on DRAW)
-  netAmount: number;      // Player Net earnings (amountWon - entryFee)
+  matchOutcome: 'NORMAL_FINISH' | 'PLAYER_QUIT' | 'TIMEOUT';
+  quitPlayerId?: string;             // Player ID who quit/forfeited if applicable
+  amountWon: number;                 // Payout received by player on WIN (e.g. ₹18)
+  amountLost: number;                // Entry fee lost on LOSS/QUIT (e.g. ₹10)
+  adminCommission: number;           // Commission kept by admin (e.g. ₹2)
+  winnerPayoutShare: number;         // Share awarded to winner
+  netAmount: number;                 // Player Net earnings (amountWon - entryFee)
   opponentName: string;
+  matchDurationSeconds?: number;
   playedAt: Date;
 }
 
@@ -48,16 +55,41 @@ const GameLogSchema: Schema = new Schema({
     type: Number,
     default: 10,
   },
+  walletBalanceBefore: {
+    type: Number,
+    default: 0,
+  },
+  walletBalanceAfter: {
+    type: Number,
+    default: 0,
+  },
   result: {
     type: String,
     enum: ['WIN', 'LOSS', 'DRAW'],
     required: true,
   },
+  matchOutcome: {
+    type: String,
+    enum: ['NORMAL_FINISH', 'PLAYER_QUIT', 'TIMEOUT'],
+    default: 'NORMAL_FINISH',
+  },
+  quitPlayerId: {
+    type: String,
+    default: '',
+  },
   amountWon: {
     type: Number,
     default: 0,
   },
+  amountLost: {
+    type: Number,
+    default: 0,
+  },
   adminCommission: {
+    type: Number,
+    default: 0,
+  },
+  winnerPayoutShare: {
     type: Number,
     default: 0,
   },
@@ -68,6 +100,10 @@ const GameLogSchema: Schema = new Schema({
   opponentName: {
     type: String,
     default: 'Online Player',
+  },
+  matchDurationSeconds: {
+    type: Number,
+    default: 0,
   },
   playedAt: {
     type: Date,
