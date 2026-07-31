@@ -19,13 +19,16 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction) => 
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'super_secret_game_jwt_key_2026_antigravity'
+        process.env.JWT_SECRET || 'baazi_backend_jwt_super_secret_7day_key_2026'
       ) as { id: string; email: string };
 
       req.user = decoded;
       return next();
-    } catch (error) {
-      return res.status(401).json({ message: 'Not authorized, token failed' });
+    } catch (error: any) {
+      if (error && error.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: 'Session expired after 7 days. Please log in again.', code: 'TOKEN_EXPIRED' });
+      }
+      return res.status(401).json({ message: 'Not authorized, token invalid', code: 'INVALID_TOKEN' });
     }
   }
 

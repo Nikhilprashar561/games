@@ -12,8 +12,8 @@ const fallbackUsers: Map<string, any> = new Map();
 const generateToken = (id: string, email: string) => {
   return jwt.sign(
     { id, email },
-    process.env.JWT_SECRET || 'super_secret_game_jwt_key_2026_antigravity',
-    { expiresIn: '30d' }
+    process.env.JWT_SECRET || 'baazi_backend_jwt_super_secret_7day_key_2026',
+    { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any }
   );
 };
 
@@ -443,3 +443,141 @@ export const updateWallet = async (req: AuthRequest, res: Response) => {
 };
 
 export const updateCoins = updateWallet;
+
+// ---------- GOOGLE OAUTH 2.0 & 7-DAY JWT CONTROLLER ----------
+import { OAuth2Client } from 'google-auth-library';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleOAuthLogin = async (req: Request, res: Response) => {
+  try {
+    const { idToken, googleProfile } = req.body;
+    let email = '';
+    let name = '';
+    let picture = '';
+    let googleId = '';
+
+    if (idToken) {
+      // Verify Google ID Token server-side
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        return res.status(400).json({ message: 'Invalid Google ID Token' });
+      }
+      email = payload.email.toLowerCase().trim();
+      name = payload.name || email.split('@')[0];
+      picture = payload.picture || '';
+      googleId = payload.sub;
+    } else if (googleProfile) {
+      // Sync from verified NextAuth session
+      email = (googleProfile.email || '').toLowerCase().trim();
+      name = googleProfile.name || email.split('@')[0];
+      picture = googleProfile.image || googleProfile.picture || '';
+      googleId = googleProfile.sub || googleProfile.id || '';
+    } else {
+      return res.status(400).json({ message: 'Google authentication payload required' });
+    }
+
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ message: 'Valid Google email is required' });
+    }
+
+    try {
+      let user = await User.findOne({ email });
+      let claimedBonusNow = false;
+
+      if (!user) {
+        user = await User.create({
+          name,
+          email,
+          googleId,
+          walletBalance: 0,
+          demoBalance: 1000,
+          upiId: `${name.toLowerCase().replace(/\s+/g, '')}@paytm`,
+          avatar: picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+          isVerified: true,
+          isGoogleVerified: true,
+          hasClaimedSignupBonus: true,
+          lastLoginAt: new Date(),
+        });
+        claimedBonusNow = true;
+      } else {
+        if (!user.hasClaimedSignupBonus) {
+          user.demoBalance = 1000;
+          user.hasClaimedSignupBonus = true;
+          claimedBonusNow = true;
+        }
+        user.googleId = googleId || user.googleId;
+        user.isGoogleVerified = true;
+        user.isVerified = true;
+        user.lastLoginAt = new Date();
+        if (picture) user.avatar = picture;
+        await user.save();
+      }
+
+      // Generate 7-Day JWT Token
+      const token = generateToken(user._id.toString(), user.email);
+
+      return res.json({
+        success: true,
+        token,
+        expiresIn: '7d',
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          walletBalance: user.walletBalance,
+          demoBalance: user.demoBalance !== undefined ? user.demoBalance : 1000,
+          upiId: user.upiId,
+          avatar: user.avatar,
+          isVerified: true,
+          isGoogleVerified: true,
+          hasClaimedSignupBonus: user.hasClaimedSignupBonus,
+        },
+        claimedBonusNow,
+        message: `Welcome ${user.name}! Logged in securely with Google.`,
+      });
+    } catch (dbErr) {
+      // In-memory fallback if DB is offline
+      let mockUser = fallbackUsers.get(email);
+      let claimedBonusNow = false;
+
+      if (!mockUser) {
+        mockUser = {
+          id: 'user_' + Date.now(),
+          name,
+          email,
+          googleId,
+          walletBalance: 0,
+          demoBalance: 1000,
+          upiId: `${name.toLowerCase().replace(/\s+/g, '')}@paytm`,
+          avatar: picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+          isVerified: true,
+          isGoogleVerified: true,
+          hasClaimedSignupBonus: true,
+        };
+        fallbackUsers.set(email, mockUser);
+        claimedBonusNow = true;
+      } else {
+        mockUser.isGoogleVerified = true;
+        mockUser.isVerified = true;
+        fallbackUsers.set(email, mockUser);
+      }
+
+      const token = generateToken(mockUser.id, mockUser.email);
+      return res.json({
+        success: true,
+        token,
+        expiresIn: '7d',
+        user: mockUser,
+        claimedBonusNow,
+        message: `Welcome ${mockUser.name}! Logged in securely with Google.`,
+      });
+    }
+  } catch (error: any) {
+    console.error('Google OAuth Controller Error:', error);
+    return res.status(500).json({ message: 'Google Authentication failed: ' + (error.message || 'Server error') });
+  }
+};

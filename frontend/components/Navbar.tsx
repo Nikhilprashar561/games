@@ -212,9 +212,10 @@ export const Navbar: React.FC = () => {
                 >
                   {user ? (
                     <img
-                      src={user.avatar}
+                      src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'Gamer')}`}
                       alt={user.name}
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/20 object-cover"
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/20 object-cover border border-emerald-500/30"
                     />
                   ) : (
                     <Menu className="w-5 h-5 text-emerald-400" />

@@ -9,10 +9,15 @@ import {
   updateName,
   requestEmailChange,
   verifyEmailChange,
+  googleOAuthLogin,
 } from '../controllers/authController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = express.Router();
+
+// Google OAuth 2.0 Auth Routes
+router.post('/google', googleOAuthLogin);
+router.post('/google-sync', googleOAuthLogin);
 
 router.post('/signup', signup);
 router.post('/login', login);

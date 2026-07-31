@@ -183,6 +183,8 @@ export const getAdminConfig = async (req: Request, res: Response) => {
   }
 };
 
+import { uploadBase64ToCloudinary } from '../utils/cloudinary';
+
 // @desc    Update Admin Config (QR Code image, UPI ID, Bank details, Enable Toggles)
 // @route   POST /api/admin/config
 export const updateAdminConfig = async (req: Request, res: Response) => {
@@ -190,7 +192,15 @@ export const updateAdminConfig = async (req: Request, res: Response) => {
     const { qrCodeUrl, upiId, upiHolderName, bankName, accountNumber, ifscCode, minDeposit, minWithdrawal, adminPasscode, isQrEnabled, isBankEnabled } = req.body;
     let settings = await getOrCreateAdminSettings();
 
-    if (qrCodeUrl !== undefined) settings.qrCodeUrl = qrCodeUrl;
+    if (qrCodeUrl !== undefined) {
+      if (typeof qrCodeUrl === 'string' && qrCodeUrl.startsWith('data:image/')) {
+        // Upload base64 image string to Cloudinary and save Cloudinary HTTPS URL in MongoDB
+        const cloudinaryRes = await uploadBase64ToCloudinary(qrCodeUrl, 'baazi_payment_qrs');
+        settings.qrCodeUrl = cloudinaryRes.url;
+      } else {
+        settings.qrCodeUrl = qrCodeUrl;
+      }
+    }
     if (upiId !== undefined) settings.upiId = upiId;
     if (upiHolderName !== undefined) settings.upiHolderName = upiHolderName;
     if (bankName !== undefined) settings.bankName = bankName;

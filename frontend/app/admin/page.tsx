@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatCoins } from '../../utils/formatCurrency';
+import { uploadImageToCloudinary } from '../../utils/cloudinary';
 import { DepositRequest, AdminSettings, User } from '../../types';
 import { Shield, Lock, Search, CheckCircle2, XCircle, Clock, RefreshCw, Save, QrCode, CreditCard, Users, ArrowUpRight, Check, AlertCircle, KeyRound, Sparkles, Upload, Image as ImageIcon, Coins, Wallet, PlusCircle, Trophy } from 'lucide-react';
 
@@ -157,8 +158,8 @@ export default function AdminPage() {
     }
   };
 
-  // Gallery Image Upload Handler
-  const handleQrGalleryFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Gallery Image Upload Handler with Cloudinary Integration
+  const handleQrGalleryFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -167,18 +168,17 @@ export default function AdminPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Url = event.target?.result as string;
-      if (base64Url) {
-        setConfigForm((prev) => ({ ...prev, qrCodeUrl: base64Url }));
-        setActionFeedback({
-          type: 'success',
-          message: 'QR Code image loaded from gallery! Click "Save Admin Payment Settings" below to publish it live to all users.',
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    setActionFeedback({ type: 'success', message: 'Uploading QR Code image to Cloudinary...' });
+    try {
+      const cloudinaryUrl = await uploadImageToCloudinary(file, 'baazi_payment_qrs');
+      setConfigForm((prev) => ({ ...prev, qrCodeUrl: cloudinaryUrl }));
+      setActionFeedback({
+        type: 'success',
+        message: 'QR Code image successfully uploaded to Cloudinary! Click "Save Admin Payment Settings" below to publish it live.',
+      });
+    } catch (err: any) {
+      setActionFeedback({ type: 'error', message: err.message || 'Failed to upload QR image to Cloudinary.' });
+    }
   };
 
   const handleApprove = async (reqId: string) => {

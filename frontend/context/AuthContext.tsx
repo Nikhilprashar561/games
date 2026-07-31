@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
 import { User, GameMatchLog, GameStats, DepositRequest, AdminSettings } from '../types';
 import { ToastContainer, ToastItem } from '../components/ToastContainer';
 
@@ -66,12 +67,44 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 axios.defaults.baseURL = API_BASE_URL;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { data: session } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
   const [playMode, setPlayModeState] = useState<PlayMode>('REAL');
+
+  // Sync NextAuth Verified Google Session with AuthContext
+  useEffect(() => {
+    if (session && (session as any).backendToken && (session as any).userData) {
+      const bToken = (session as any).backendToken;
+      const bUser = (session as any).userData;
+      setToken(bToken);
+      setUser(bUser);
+      localStorage.setItem('token', bToken);
+      localStorage.setItem('user_session', JSON.stringify(bUser));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${bToken}`;
+    }
+  }, [session]);
+
+  // Handle 7-Day Token Expiration & 401 Unauthorized Interception
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          if (error.response.data?.code === 'TOKEN_EXPIRED') {
+            showToast('Session expired after 7 days. Please sign in again with Google.', 'warning');
+            logout();
+            setIsAuthModalOpen(true);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   // Restore Session & Play Mode on Mount
   useEffect(() => {
@@ -234,6 +267,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    try {
+      nextAuthSignOut({ redirect: false });
+    } catch (e) {
+      // ignore
+    }
     showToast('Logged out successfully', 'info');
   };
 

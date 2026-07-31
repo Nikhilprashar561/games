@@ -9,6 +9,9 @@ export interface IUser extends Document {
   upiId: string;
   avatar: string;
   isVerified: boolean;
+  googleId?: string;
+  isGoogleVerified?: boolean;
+  lastLoginAt?: Date;
   otp?: string;
   otpExpires?: Date;
   pendingEmail?: string;
@@ -55,6 +58,18 @@ const UserSchema: Schema = new Schema({
   isVerified: {
     type: Boolean,
     default: false,
+  },
+  googleId: {
+    type: String,
+    default: null,
+  },
+  isGoogleVerified: {
+    type: Boolean,
+    default: false,
+  },
+  lastLoginAt: {
+    type: Date,
+    default: Date.now,
   },
   otp: {
     type: String,

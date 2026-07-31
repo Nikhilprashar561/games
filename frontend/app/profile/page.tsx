@@ -14,7 +14,7 @@ import { AddMoneyModal } from '../../components/AddMoneyModal';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ProfilePage() {
-  const { user, fetchMatchHistory, updateName, requestEmailChange, verifyEmailChange } = useAuth();
+  const { user, fetchMatchHistory, updateName } = useAuth();
   const [selectedGameSlug, setSelectedGameSlug] = useState<string>('all');
   const [isAddMoneyOpen, setIsAddMoneyOpen] = useState<boolean>(false);
   
@@ -22,13 +22,6 @@ export default function ProfilePage() {
   const [editingName, setEditingName] = useState<string>('');
   const [isSavingName, setIsSavingName] = useState<boolean>(false);
   const [nameMsg, setNameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Email Update with 4-Digit OTP State
-  const [newEmail, setNewEmail] = useState<string>('');
-  const [emailOtp, setEmailOtp] = useState<string>('');
-  const [emailStep, setEmailStep] = useState<'request' | 'verify'>('request');
-  const [isSendingEmailOtp, setIsSendingEmailOtp] = useState<boolean>(false);
-  const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [stats, setStats] = useState<GameStats>({
     totalMatches: 0,
@@ -76,48 +69,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleRequestEmailOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = newEmail.trim();
-    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
-      setEmailMsg({ type: 'error', text: 'Please enter a valid new email address' });
-      return;
-    }
-    setIsSendingEmailOtp(true);
-    setEmailMsg(null);
-    try {
-      await requestEmailChange(cleanEmail);
-      setEmailStep('verify');
-      setEmailMsg({ type: 'success', text: `4-Digit OTP sent to ${cleanEmail}. Check your inbox!` });
-    } catch (err: any) {
-      setEmailMsg({ type: 'error', text: err.message || 'Failed to send verification OTP' });
-    } finally {
-      setIsSendingEmailOtp(false);
-    }
-  };
-
-  const handleVerifyEmailOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailOtp || emailOtp.length < 4) {
-      setEmailMsg({ type: 'error', text: 'Please enter the 4-digit verification OTP' });
-      return;
-    }
-    setIsSendingEmailOtp(true);
-    setEmailMsg(null);
-    try {
-      await verifyEmailChange(newEmail.trim(), emailOtp.trim());
-      setEmailMsg({ type: 'success', text: 'Email updated successfully!' });
-      setEmailStep('request');
-      setNewEmail('');
-      setEmailOtp('');
-      setTimeout(() => setEmailMsg(null), 3500);
-    } catch (err: any) {
-      setEmailMsg({ type: 'error', text: err.message || 'Invalid OTP code' });
-    } finally {
-      setIsSendingEmailOtp(false);
-    }
-  };
-
   const selectedGameInfo = gamesData.find((g) => g.slug === selectedGameSlug);
 
   return (
@@ -141,9 +92,10 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-5">
               <div className="relative">
                 <img
-                  src={user?.avatar}
+                  src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || 'Gamer')}`}
                   alt={user?.name}
-                  className="w-20 h-20 rounded-2xl bg-emerald-500/20 p-1 border-2 border-emerald-500/40 shadow-xl"
+                  referrerPolicy="no-referrer"
+                  className="w-20 h-20 rounded-2xl bg-emerald-500/20 p-1 border-2 border-emerald-500/40 shadow-xl object-cover"
                 />
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-900"></div>
               </div>
@@ -204,10 +156,8 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Account Profile Settings: Update Name & Change Email with OTP */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Card 1: Update Display Name */}
+        {/* Account Profile Settings: Update Display Name */}
+        <div className="max-w-2xl">
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl bg-[#0a0f1d] text-white space-y-4">
             <div className="flex items-center space-x-2 pb-3 border-b border-slate-800">
               <Edit2 className="w-5 h-5 text-emerald-400" />
@@ -243,87 +193,6 @@ export default function ProfilePage() {
               </button>
             </form>
           </div>
-
-          {/* Card 2: Update Email Address with 4-Digit OTP Verification */}
-          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-slate-800 shadow-xl bg-[#0a0f1d] text-white space-y-4">
-            <div className="flex items-center space-x-2 pb-3 border-b border-slate-800">
-              <Mail className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-black font-['Space_Grotesk']">Update Email (OTP Verified)</h2>
-            </div>
-
-            {emailMsg && (
-              <div className={`p-3 rounded-xl text-xs font-bold flex items-center space-x-2 ${
-                emailMsg.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-              }`}>
-                {emailMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                <span>{emailMsg.text}</span>
-              </div>
-            )}
-
-            {emailStep === 'request' ? (
-              <form onSubmit={handleRequestEmailOTP} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">New Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="newemail@gmail.com"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                  <p className="text-[11px] text-amber-400 mt-1 font-semibold">
-                    💡 A 4-digit verification OTP code will be sent to your new email.
-                  </p>
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSendingEmailOtp}
-                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl shadow-md text-sm transition-all disabled:opacity-50"
-                >
-                  {isSendingEmailOtp ? 'Sending OTP...' : 'Send 4-Digit OTP to New Email 📩'}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyEmailOTP} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                    Enter 4-Digit OTP sent to {newEmail}
-                  </label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
-                    <input
-                      type="text"
-                      maxLength={4}
-                      required
-                      placeholder="1234"
-                      value={emailOtp}
-                      onChange={(e) => setEmailOtp(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-lg tracking-widest text-center focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setEmailStep('request')}
-                    className="w-1/3 py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSendingEmailOtp || emailOtp.length < 4}
-                    className="w-2/3 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl shadow-md text-sm transition-all disabled:opacity-50"
-                  >
-                    {isSendingEmailOtp ? 'Verifying...' : 'Verify OTP & Update Email 🚀'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-          </div>
-
         </div>
 
         {/* Game Filter Selector Tabs */}
