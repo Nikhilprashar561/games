@@ -39,12 +39,12 @@ interface SessionStats {
 
 const ENTRY_COST = 10;
 
-// Payout structure — 25 of 100 tiles pay out (25% odds), the rest are empty.
+// Payout structure — 18 of 100 tiles pay out (18% odds), the rest are empty.
 const PAYOUT_TIERS = [
-  { amount: 50, count: 2 },
-  { amount: 25, count: 5 },
-  { amount: 15, count: 8 },
-  { amount: 12, count: 10 },
+  { amount: 50, count: 1 },
+  { amount: 25, count: 4 },
+  { amount: 15, count: 6 },
+  { amount: 12, count: 7 },
 ];
 const TOTAL_TILES = 100;
 const WIN_TILE_COUNT = PAYOUT_TIERS.reduce((sum, t) => sum + t.count, 0);
@@ -196,7 +196,7 @@ export default function NumberPredictPage() {
             <div>
               <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase mb-1">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>25% Odds Cash Vault</span>
+                <span>18% Odds Cash Vault</span>
               </div>
               <h1 className="text-3xl font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
                 Number Predict & Win
@@ -219,8 +219,8 @@ export default function NumberPredictPage() {
                 <h2 className="text-2xl font-black font-['Space_Grotesk']">{playMode === 'REAL' ? 'Reveal 1 Tile, Win Up to ₹50' : 'Reveal 1 Tile, Win Up to 🪙 500'}</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   {playMode === 'REAL'
-                    ? `Pay a ₹${ENTRY_COST} entry to open a freshly shuffled 100-tile vault. 25 tiles pay out real cash, straight to your wallet.`
-                    : `Pay 🪙 ${ENTRY_COST * 10} Demo Coins to open a freshly shuffled 100-tile vault. 25 tiles pay out practice coins.`}
+                    ? `Pay a ₹${ENTRY_COST} entry to open a freshly shuffled 100-tile vault. 18 tiles pay out real cash, straight to your wallet.`
+                    : `Pay 🪙 ${ENTRY_COST * 10} Demo Coins to open a freshly shuffled 100-tile vault. 18 tiles pay out practice coins.`}
                 </p>
               </div>
 

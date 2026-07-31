@@ -75,16 +75,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
   const [playMode, setPlayModeState] = useState<PlayMode>('REAL');
 
-  // Sync NextAuth Verified Google Session with AuthContext
+  // Fetch live user profile & wallet balance directly from MongoDB
+  const fetchUserProfile = async (authToken?: string) => {
+    const activeToken = authToken || token || localStorage.getItem('token');
+    if (!activeToken) return;
+
+    try {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${activeToken}`;
+      const response = await axios.get('/api/auth/me');
+      if (response.data && response.data.success && response.data.user) {
+        const freshUser = response.data.user;
+        setUser((prevUser) => {
+          const merged = { ...(prevUser || {}), ...freshUser };
+          localStorage.setItem('user_session', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to sync live profile from database:', error);
+    }
+  };
+
+  // Sync NextAuth Verified Google Session & fetch live database profile
   useEffect(() => {
-    if (session && (session as any).backendToken && (session as any).userData) {
+    if (session && (session as any).backendToken) {
       const bToken = (session as any).backendToken;
       const bUser = (session as any).userData;
       setToken(bToken);
-      setUser(bUser);
+      if (bUser) {
+        setUser((prev) => prev || bUser);
+      }
       localStorage.setItem('token', bToken);
-      localStorage.setItem('user_session', JSON.stringify(bUser));
       axios.defaults.headers.common['Authorization'] = `Bearer ${bToken}`;
+      fetchUserProfile(bToken);
     }
   }, [session]);
 
@@ -106,33 +129,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  // Restore Session & Play Mode on Mount
+  // Restore Session, fetch live DB profile, and bind tab focus listener
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user_session');
     const storedMode = localStorage.getItem('baazi_play_mode') as PlayMode;
 
-    if (storedToken) {
-      setToken(storedToken);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-    }
-
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        if (parsed.demoBalance === undefined || parsed.demoBalance === 10000) {
-          parsed.demoBalance = 1000;
-          localStorage.setItem('user_session', JSON.stringify(parsed));
-        }
+        if (parsed.demoBalance === undefined) parsed.demoBalance = 1000;
         setUser(parsed);
       } catch (e) {
         // ignore
       }
     }
 
+    if (storedToken) {
+      setToken(storedToken);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      fetchUserProfile(storedToken);
+    }
+
     if (storedMode === 'DEMO' || storedMode === 'REAL') {
       setPlayModeState(storedMode);
     }
+
+    // Refetch live user profile when user switches back to application tab
+    const handleFocus = () => {
+      const activeTok = storedToken || localStorage.getItem('token');
+      if (activeTok) {
+        fetchUserProfile(activeTok);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);

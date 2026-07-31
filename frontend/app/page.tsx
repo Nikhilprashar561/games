@@ -31,7 +31,7 @@ export default function HomePage() {
 
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80">
             <Trophy className="w-4 h-4 text-amber-500" />
-            <span>7 Live Multiplayer Arenas</span>
+            <span>6 Live Multiplayer Arenas</span>
           </div>
         </div>
 

@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useAuth } from '../../../context/AuthContext';
+
+const LudoBoardCanvas = dynamic(() => import('../../../components/phaser/LudoBoardCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-[560px] aspect-square rounded-3xl bg-slate-900 animate-pulse flex items-center justify-center text-slate-400 font-bold">
+      Loading Phaser 60FPS Ludo Engine...
+    </div>
+  ),
+});
 import { formatCurrency, formatCoins } from '../../../utils/formatCurrency';
 import { ProtectedRoute } from '../../../components/ProtectedRoute';
 import { useRouter } from 'next/navigation';
@@ -454,7 +464,7 @@ export default function LudoPage() {
       }
 
       const movable = getMovableTokens(userColor, finalRoll);
-      if (movable.length === 1) {
+      if (movable.length === 1 || (finalRoll === 6 && movable.length > 0 && movable.every((t) => t.position === -1))) {
         setTimeout(() => {
           executeMoveToken(userColor, movable[0].id, finalRoll);
         }, 350);
@@ -476,6 +486,8 @@ export default function LudoPage() {
     if (position >= 100 && position <= 104) return HOME_STRETCH_COORDS[color][position - 100];
     return null;
   };
+
+  const [lastMovedToken, setLastMovedToken] = useState<{ color: PlayerColor; id: number; path: number[] } | null>(null);
 
   const executeMoveToken = (color: PlayerColor, tokenId: number, dice: number, onComplete?: () => void) => {
     const playerTokens = tokensRef.current[color];
@@ -499,6 +511,7 @@ export default function LudoPage() {
       tok.stepCount = 1;
 
       updateTokensState(newTokens);
+      setLastMovedToken({ color, id: tokenId, path: [START_INDEXES[color]] });
       setTravelingTokenId(null);
       setHasRolled(false);
       showLudoBanner('safe', `⭐ Token Unlocked to Start Cell!`);
@@ -514,6 +527,20 @@ export default function LudoPage() {
     let currentStep = targetToken.stepCount;
     const targetStep = currentStep + dice;
     if (targetStep > 57) return;
+
+    const pathPositions: number[] = [];
+    for (let s = currentStep + 1; s <= targetStep; s++) {
+      if (s === 57) {
+        pathPositions.push(200);
+      } else if (s > 51) {
+        pathPositions.push(100 + (s - 52));
+      } else {
+        const startIdx = START_INDEXES[color];
+        pathPositions.push((startIdx + (s - 1)) % 52);
+      }
+    }
+
+    setLastMovedToken({ color, id: tokenId, path: pathPositions });
 
     const pathCoords: [number, number][] = [];
 
@@ -935,147 +962,15 @@ const renderPawn = (
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8 items-start">
 
-              {/* Board Canvas */}
-              <div className="lg:col-span-8 flex flex-col items-center">
-                <div className="w-[300px] h-[300px] xs:w-[320px] xs:h-[320px] sm:w-[460px] sm:h-[460px] border-2 sm:border-4 border-slate-900 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl grid grid-cols-15 grid-rows-15 bg-[#fafafa] select-none relative mx-auto">
-
-                  {/* RED BASE YARD */}
-                  {renderBaseYard('red', 'col-span-6 row-span-6 border-b-2 border-r-2 border-slate-900')}
-
-                  {/* GREEN BASE YARD */}
-                  {renderBaseYard('green', 'col-start-10 col-span-6 row-span-6 border-b-2 border-l-2 border-slate-900')}
-
-                  {/* BLUE BASE YARD */}
-                  {renderBaseYard('blue', 'row-start-10 col-span-6 row-span-6 border-t-2 border-r-2 border-slate-900')}
-
-                  {/* YELLOW BASE YARD */}
-                  {renderBaseYard('yellow', 'row-start-10 col-start-10 col-span-6 row-span-6 border-t-2 border-l-2 border-slate-900')}
-
-                  {/* CENTER HOME — polished pinwheel medallion: four color wedges with clean
-                      spoke dividers and a bezel ring, so it reads as a proper finish point
-                      rather than a flat block dropped onto the grid */}
-                  <div
-                    className="col-start-7 row-start-7 col-span-3 row-span-3 rounded-xl flex items-center justify-center z-10 relative overflow-hidden"
-                    style={{
-                      background: 'conic-gradient(from -45deg, #16a34a 0deg 90deg, #f59e0b 90deg 180deg, #2563eb 180deg 270deg, #e11d48 270deg 360deg)',
-                      boxShadow:
-                        'inset 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 2px rgba(15,23,42,0.85), 0 8px 20px rgba(0,0,0,0.35), inset 0 2px 6px rgba(255,255,255,0.25)',
-                    }}
-                  >
-                    {/* Diagonal spoke dividers between wedges, matching the crisp hairlines used across the rest of the board */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 rotate-45" />
-                      <div className="absolute top-1/2 left-1/2 w-[145%] h-[2px] bg-white/70 -translate-x-1/2 -translate-y-1/2 -rotate-45" />
-                    </div>
-
-                    {winner ? (
-                      <div className="relative flex flex-col items-center animate-bounce bg-white rounded-xl px-2 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2 ring-amber-300">
-                        <Crown className="w-7 h-7 text-amber-500 fill-current drop-shadow-md" />
-                        <span className="text-[9px] font-black uppercase text-slate-950">WINNER</span>
-                      </div>
-                    ) : (
-                      <div className="relative flex items-center justify-center bg-white rounded-full w-8 h-8 sm:w-10 sm:h-10 shadow-[0_2px_10px_rgba(0,0,0,0.3)] ring-2 ring-white">
-                        <Sparkles className="w-5 h-5 text-slate-950 animate-bounce" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 15x15 GRID CELLS */}
-                  {Array.from({ length: 15 }, (_, r) =>
-                    Array.from({ length: 15 }, (_, c) => {
-                      const row = r + 1;
-                      const col = c + 1;
-
-                      if (
-                        (row <= 6 && col <= 6) ||
-                        (row <= 6 && col >= 10) ||
-                        (row >= 10 && col <= 6) ||
-                        (row >= 10 && col >= 10) ||
-                        (row >= 7 && row <= 9 && col >= 7 && col <= 9)
-                      ) {
-                        return null;
-                      }
-
-                      const isRedHomeStr = row === 8 && col >= 2 && col <= 6;
-                      const isGreenHomeStr = col === 8 && row >= 2 && row <= 6;
-                      const isYellowHomeStr = row === 8 && col >= 10 && col <= 14;
-                      const isBlueHomeStr = col === 8 && row >= 10 && row <= 14;
-                      const isHomeStretch = isRedHomeStr || isGreenHomeStr || isYellowHomeStr || isBlueHomeStr;
-
-                      const isRedStart = row === 7 && col === 2;
-                      const isGreenStart = row === 2 && col === 9;
-                      const isYellowStart = row === 9 && col === 14;
-                      const isBlueStart = row === 14 && col === 7;
-
-                      const isStarCell =
-                        (row === 3 && col === 7) ||
-                        (row === 13 && col === 9) ||
-                        (row === 9 && col === 3) ||
-                        (row === 7 && col === 13);
-
-                      // The home-stretch tile that sits directly against the center hub —
-                      // dressed up as a checkered finish line, like a real racing finish.
-                      const isFinishTile =
-                        (row === 8 && col === 6) ||
-                        (col === 8 && row === 6) ||
-                        (row === 8 && col === 10) ||
-                        (col === 8 && row === 10);
-
-                      const arrow = ENTRY_ARROWS.find((a) => a.row === row && a.col === col);
-
-                      return (
-                        <div
-                          key={`cell-${row}-${col}`}
-                          className={`relative flex items-center justify-center font-bold text-[9px] ${
-                            isRedHomeStr || isRedStart
-                              ? `${COLOR_THEME.red.tile} text-white`
-                              : isGreenHomeStr || isGreenStart
-                              ? `${COLOR_THEME.green.tile} text-white`
-                              : isYellowHomeStr || isYellowStart
-                              ? `${COLOR_THEME.yellow.tile} text-slate-950`
-                              : isBlueHomeStr || isBlueStart
-                              ? `${COLOR_THEME.blue.tile} text-white`
-                              : 'bg-white text-slate-700'
-                          }`}
-                          style={{
-                            gridRowStart: row,
-                            gridColumnStart: col,
-                            boxShadow: isHomeStretch
-                              ? 'inset 0 0 0 2px rgba(255,255,255,0.7)'
-                              : 'inset 0 0 0 1px #cbd5e1',
-                          }}
-                        >
-                          {isHomeStretch && !isFinishTile && (
-                            <div
-                              className={`pointer-events-none absolute bg-white/40 ${
-                                isRedHomeStr || isYellowHomeStr ? 'top-[15%] bottom-[15%] left-1/2 -translate-x-1/2 w-[3px]' : 'left-[15%] right-[15%] top-1/2 -translate-y-1/2 h-[3px]'
-                              } rounded-full`}
-                            />
-                          )}
-                          {isFinishTile && (
-                            <div
-                              className="pointer-events-none absolute inset-0 opacity-90"
-                              style={{
-                                backgroundImage:
-                                  'repeating-conic-gradient(#ffffff 0% 25%, rgba(15,23,42,0.55) 0% 50%)',
-                                backgroundSize: '8px 8px',
-                              }}
-                            />
-                          )}
-                          {isStarCell && <Star className="w-3 h-3 text-amber-400 fill-current" />}
-                          {arrow && (
-                            <arrow.Icon
-                              className="w-3 h-3 opacity-90"
-                              style={{ color: arrow.color === 'yellow' ? '#78350f' : 'white' }}
-                            />
-                          )}
-                          {renderCellTokens(row, col)}
-                        </div>
-                      );
-                    })
-                  )}
-
-                </div>
+              {/* Board Canvas (Phaser 2D Canvas Engine) */}
+              <div className="lg:col-span-8">
+                <LudoBoardCanvas
+                  tokens={tokens}
+                  activePlayerColor={currentTurn}
+                  validTokenIds={getMovableTokens(currentTurn, diceVal).map((t: Token) => t.id)}
+                  onTokenClick={(color, id) => handlePlayerTokenClick(id)}
+                  lastMovedToken={lastMovedToken}
+                />
               </div>
 
               {/* Controls Panel — Compact & Mobile Responsive (0-scroll viewport fit) */}

@@ -9,7 +9,7 @@ export const AboutFaqSection: React.FC = () => {
   const faqs = [
     {
       q: 'Which games are free to play on Baazi Board?',
-      a: 'Tic-Tac-Toe is 100% public and free to play for all visitors without needing to log in. Other premium multiplayer games like Chess, Ludo, Snake & Ladder, Teen Patti, Carrom, and Number Predict require a quick free account signup to track rankings and coin rewards.',
+      a: 'Tic-Tac-Toe is 100% public and free to play for all visitors without needing to log in. Other premium multiplayer games like Chess, Ludo, Snake & Ladder, Carrom, and Number Predict require a quick free account signup to track rankings and coin rewards.',
     },
     {
       q: 'How does real-time multiplayer work?',
@@ -70,8 +70,8 @@ export const AboutFaqSection: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-500 flex items-center justify-center mb-3">
                 <Users className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">7 Classic Games</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chess, Ludo, Carrom, Teen Patti, Tic Tac Toe and more.</p>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">6 Classic Games</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chess, Ludo, Carrom, Snake & Ladder, Tic Tac Toe and more.</p>
             </div>
           </div>
 

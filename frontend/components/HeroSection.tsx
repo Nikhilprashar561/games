@@ -56,7 +56,7 @@ export const HeroSection: React.FC = () => {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed font-normal">
-                Challenge real players online in Chess, Ludo, Snake & Ladder, Teen Patti, Carrom, and Number Predict! Jump into Tic-Tac-Toe completely free.
+                Challenge real players online in Chess, Ludo, Snake & Ladder, Carrom, and Number Predict! Jump into Tic-Tac-Toe completely free.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
@@ -72,7 +72,7 @@ export const HeroSection: React.FC = () => {
                   href="#games-section"
                   className="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-base border border-slate-700 transition-all flex items-center justify-center"
                 >
-                  Explore All 7 Games
+                  Explore All 6 Games
                 </a>
               </div>
 

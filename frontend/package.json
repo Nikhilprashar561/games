@@ -9,13 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/matter-js": "^0.20.2",
     "axios": "^1.6.8",
     "canvas-confetti": "^1.9.2",
+    "chess.js": "^1.4.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.368.0",
+    "matter-js": "^0.20.0",
     "next": "^14.2.3",
     "next-auth": "^4.24.15",
+    "phaser": "^4.2.1",
     "react": "^18.3.1",
+    "react-chessboard": "^5.10.0",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.7.5",
     "tailwind-merge": "^2.3.0"
