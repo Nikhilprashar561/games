@@ -17,9 +17,10 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction) => 
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
+      const secret = process.env.JWT_SECRET || 'fallback_dev_secret_change_in_env';
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'baazi_backend_jwt_super_secret_7day_key_2026'
+        secret
       ) as { id: string; email: string };
 
       req.user = decoded;

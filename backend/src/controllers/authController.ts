@@ -10,9 +10,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const fallbackUsers: Map<string, any> = new Map();
 
 const generateToken = (id: string, email: string) => {
+  const secret = process.env.JWT_SECRET || 'fallback_dev_secret_change_in_env';
   return jwt.sign(
     { id, email },
-    process.env.JWT_SECRET || 'baazi_backend_jwt_super_secret_7day_key_2026',
+    secret,
     { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any }
   );
 };
