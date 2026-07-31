@@ -210,9 +210,13 @@ export default function NumberPredictPage() {
           </div>
 
           {!hasEntered ? (
-            <div className="text-center py-12 px-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-8">
-              <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-600 text-white flex items-center justify-center shadow-xl">
-                <Gift className="w-8 h-8" />
+            <div className="text-center py-10 px-6 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-8">
+              <div className="max-w-md mx-auto aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl border-2 border-purple-500/30">
+                <img
+                  src="/images/number_predict_cover.png"
+                  alt="Number Predict & Win"
+                  className="w-full h-full object-cover"
+                />
               </div>
 
               <div className="max-w-md mx-auto space-y-2">
