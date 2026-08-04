@@ -141,6 +141,52 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
     }
   };
 
+  // Launch installed UPI Application directly with pre-filled amount and target UPI ID
+  const handleLaunchUpiApp = (appName: string, packageScheme?: string) => {
+    setFeedback(null);
+    const numAmt = Number(amount);
+    const minRequired = config?.minDeposit || 10;
+
+    if (!numAmt || numAmt < minRequired) {
+      setFeedback({
+        type: 'error',
+        message: `Please enter a valid deposit amount of at least ₹${minRequired}`,
+      });
+      return;
+    }
+
+    const targetUpiId = config?.upiId || 'baazigames@upi';
+    const merchantName = 'BaaziBoard';
+
+    // Standard UPI deep link specification (pre-fills payee UPI ID, payee name, amount, currency)
+    const standardUpiUri = `upi://pay?pa=${encodeURIComponent(targetUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${numAmt}&cu=INR`;
+
+    let appSpecificUri = standardUpiUri;
+    if (packageScheme === 'phonepe') {
+      appSpecificUri = `phonepe://pay?pa=${encodeURIComponent(targetUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${numAmt}&cu=INR`;
+    } else if (packageScheme === 'gpay') {
+      appSpecificUri = `tez://upi/pay?pa=${encodeURIComponent(targetUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${numAmt}&cu=INR`;
+    } else if (packageScheme === 'paytm') {
+      appSpecificUri = `paytmmp://pay?pa=${encodeURIComponent(targetUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${numAmt}&cu=INR`;
+    } else if (packageScheme === 'bhim') {
+      appSpecificUri = `bhim://pay?pa=${encodeURIComponent(targetUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${numAmt}&cu=INR`;
+    }
+
+    try {
+      // Trigger deep link navigation
+      window.location.href = appSpecificUri;
+
+      // Fallback timer: if app-specific scheme is not handled, fall back to standard upi:// scheme
+      if (packageScheme && packageScheme !== 'generic') {
+        setTimeout(() => {
+          window.location.href = standardUpiUri;
+        }, 1000);
+      }
+    } catch (err) {
+      window.location.href = standardUpiUri;
+    }
+  };
+
   // Image Upload File Handler (Deposit Screenshot)
   const handleDepositImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -244,11 +290,11 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+      <div className="relative w-full max-w-xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
-        {/* Modal Header */}
-        <div className="p-5 sm:p-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
               <Wallet className="w-5 h-5" />
@@ -339,18 +385,130 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
           
           {/* TAB 1: ADD MONEY / DEPOSIT */}
           {activeTab === 'DEPOSIT' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               
-              {/* Step 1: Admin Payment Details & QR Code */}
+              {/* Step 1: Enter or Select Amount */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase text-emerald-400 tracking-wider">
+                    Step 1: Enter or Select Amount
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    Min Deposit: ₹{config?.minDeposit || 10}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-emerald-400 font-['Space_Grotesk']">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter deposit amount"
+                    className="w-full pl-9 pr-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white font-black text-lg focus:border-emerald-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_AMOUNTS.map((amt) => (
+                    <button
+                      type="button"
+                      key={amt}
+                      onClick={() => setAmount(String(amt))}
+                      className={`px-3.5 py-2 rounded-xl font-black text-xs transition-all border ${
+                        Number(amount) === amt
+                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20'
+                          : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-emerald-500/40 hover:text-white'
+                      }`}
+                    >
+                      +₹{amt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2: ONE-TAP DIRECT APP LAUNCHER */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 font-['Space_Grotesk']">
+                    <span className="text-amber-400 font-black text-sm">⚡</span>
+                    <span className="text-xs font-black uppercase text-slate-200 tracking-wider">
+                      ONE-TAP DIRECT APP LAUNCHER:
+                    </span>
+                  </div>
+                  <span className="text-xs font-black text-emerald-400 font-['Space_Grotesk']">
+                    Auto ₹{amount || '0'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchUpiApp('PhonePe', 'phonepe')}
+                    className="p-3.5 rounded-2xl bg-[#1d1238]/80 hover:bg-[#28184e] border border-purple-500/30 flex flex-col items-center justify-center space-y-2 transition-all group hover:scale-[1.02] shadow-lg shadow-purple-950/40"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-purple-600/30 p-1 flex items-center justify-center overflow-hidden border border-purple-400/40">
+                      <img src="/images/phone%20pe.png" alt="PhonePe" className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-xs font-bold text-white group-hover:text-purple-300 font-['Space_Grotesk']">PhonePe</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchUpiApp('GPay', 'gpay')}
+                    className="p-3.5 rounded-2xl bg-[#0f2042]/80 hover:bg-[#152d5e] border border-blue-500/30 flex flex-col items-center justify-center space-y-2 transition-all group hover:scale-[1.02] shadow-lg shadow-blue-950/40"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-blue-600/30 p-1 flex items-center justify-center overflow-hidden border border-blue-400/40">
+                      <img src="/images/google%20pay.png" alt="GPay" className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-xs font-bold text-white group-hover:text-blue-300 font-['Space_Grotesk']">GPay</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchUpiApp('Paytm', 'paytm')}
+                    className="p-3.5 rounded-2xl bg-[#0c1c33]/80 hover:bg-[#122b4d] border border-sky-500/30 flex flex-col items-center justify-center space-y-2 transition-all group hover:scale-[1.02] shadow-lg shadow-sky-950/40"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-sky-600/30 p-1 flex items-center justify-center overflow-hidden border border-sky-400/40">
+                      <img src="/images/paytm.jpeg" alt="Paytm" className="w-full h-full object-contain rounded-full" />
+                    </div>
+                    <span className="text-xs font-bold text-white group-hover:text-sky-300 font-['Space_Grotesk']">Paytm</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchUpiApp('BHIM', 'bhim')}
+                    className="p-3.5 rounded-2xl bg-[#0a291e]/80 hover:bg-[#0f3d2d] border border-emerald-500/30 flex flex-col items-center justify-center space-y-2 transition-all group hover:scale-[1.02] shadow-lg shadow-emerald-950/40"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-emerald-600/30 p-1 flex items-center justify-center overflow-hidden border border-emerald-400/40">
+                      <img src="/images/bhim.png" alt="BHIM" className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-xs font-bold text-white group-hover:text-emerald-300 font-['Space_Grotesk']">BHIM</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleLaunchUpiApp('UPI App', 'generic')}
+                  className="w-full py-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs transition-all flex items-center justify-center space-x-2"
+                >
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  <span>Pay ₹{amount || '0'} via Any Installed UPI App 🚀</span>
+                </button>
+              </div>
+
+              {/* Step 3: Web / Desktop Fallback */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase text-emerald-400 tracking-wider">Step 1: Scan & Pay Admin UPI</span>
-                  <span className="text-[11px] font-bold text-slate-400">Min Deposit: ₹{config?.minDeposit || 10}</span>
+                  <span className="text-xs font-extrabold uppercase text-slate-300 tracking-wider">
+                    Web / Desktop Fallback: Scan QR or Copy UPI
+                  </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                  
-                  {/* Focus QR Code Preview Card */}
                   <div className="w-36 h-36 rounded-2xl bg-white p-2 border-2 border-emerald-500/40 shadow-xl flex items-center justify-center shrink-0">
                     {config?.qrCodeUrl ? (
                       <img src={config.qrCodeUrl} alt="Admin UPI QR Code" className="w-full h-full object-contain" />
@@ -359,8 +517,8 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                     )}
                   </div>
 
-                  <div className="flex-1 space-y-2 text-center sm:text-left">
-                    <p className="text-xs text-slate-400">Pay using GPay, PhonePe, Paytm, BHIM, or any UPI app.</p>
+                  <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                    <p className="text-xs text-slate-400">Scan this QR code with any UPI app to pay ₹{amount || '0'}.</p>
 
                     <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                       <span className="text-xs font-mono font-bold text-amber-400">{config?.upiId || 'baazigames@upi'}</span>
@@ -374,34 +532,18 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                       </button>
                     </div>
                   </div>
-
                 </div>
               </div>
 
-              {/* Step 2: Submit UTR & Payment Screenshot */}
-              <form onSubmit={handleDepositSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Amount Paid (₹)</label>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="Enter amount paid"
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-white font-bold text-base focus:border-emerald-500 outline-none"
-                    required
-                  />
-                  <div className="flex gap-2">
-                    {PRESET_AMOUNTS.map((amt) => (
-                      <button
-                        type="button"
-                        key={amt}
-                        onClick={() => setAmount(String(amt))}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors"
-                      >
-                        +₹{amt}
-                      </button>
-                    ))}
-                  </div>
+              {/* Step 4: Submit UTR & Payment Screenshot */}
+              <form onSubmit={handleDepositSubmit} className="space-y-4 border-t border-slate-800 pt-4">
+                <div className="space-y-1">
+                  <span className="text-xs font-extrabold uppercase text-emerald-400 tracking-wider">
+                    Step 3: Confirm Payment Details
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    After completing payment in your UPI app, enter your 12-Digit UTR number and attach payment screenshot.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -416,7 +558,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                   />
                 </div>
 
-                {/* Focused Payment Screenshot Upload Field */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Attach Payment Screenshot (Proof)</label>
                   <div className="relative border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-950">
@@ -457,7 +598,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                   {submitting ? 'Submitting Payment Proof...' : 'Submit Deposit Request 🚀'}
                 </button>
               </form>
-
             </div>
           )}
 
