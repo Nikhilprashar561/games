@@ -416,6 +416,11 @@ export const getAdminStats = async (req: Request, res: Response) => {
     const gameLogs = await GameLog.find({ playMode: 'REAL' });
     const totalAdminCommission = gameLogs.reduce((sum, g) => sum + (g.adminCommission || 0), 0);
 
+    // Dynamically calculate online users (updated within last 15 mins) & active game matches
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const onlineUsersCount = await User.countDocuments({ updatedAt: { $gte: fifteenMinsAgo } });
+    const activeGamesCount = await GameLog.countDocuments({ createdAt: { $gte: fifteenMinsAgo } });
+
     const now = Date.now();
     const slaBreachesCount = pendingWithdrawals.filter((w) => new Date(w.slaDeadline).getTime() < now).length;
 
@@ -423,6 +428,8 @@ export const getAdminStats = async (req: Request, res: Response) => {
       success: true,
       stats: {
         totalUsers,
+        onlineUsersCount: Math.max(1, onlineUsersCount),
+        activeGamesCount,
         totalRealDeposits,
         totalRealWithdrawals,
         pendingWithdrawalAmount,

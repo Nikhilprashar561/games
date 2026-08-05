@@ -248,7 +248,7 @@ function GamePawn({
 }
 
 export default function SnakeLadderPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const router = useRouter();
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
@@ -382,19 +382,24 @@ export default function SnakeLadderPage() {
       openAuthModal();
       return;
     }
-    if (playMode === 'DEMO') {
-      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
-      return;
-    }
-    const currentBalance = user?.walletBalance || 0;
-    if (currentBalance < ENTRY_COST) {
-      showToast(`Insufficient Real Money balance! Entry fee is ₹${ENTRY_COST}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
+    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
+    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
+      showToast(
+        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
+          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
+        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
+        'error'
+      );
       return;
     }
     if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);
     playerSixStreakRef.current = 0;
     opponentSixStreakRef.current = 0;
-    await updateWalletBalance(-ENTRY_COST);
+    if (playMode === 'REAL') {
+      await updateWalletBalance(-ENTRY_COST);
+    } else {
+      updateDemoBalance(-ENTRY_COST);
+    }
     setHasPaidEntry(true);
     updatePlayerPosition(1);
     updateOpponentPosition(1);

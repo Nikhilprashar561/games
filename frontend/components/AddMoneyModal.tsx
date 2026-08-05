@@ -155,7 +155,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
       return;
     }
 
-    const targetUpiId = config?.upiId || 'baazigames@upi';
+    const targetUpiId = config?.upiId;
+    if (!targetUpiId) {
+      setFeedback({
+        type: 'error',
+        message: 'Admin UPI Payment ID is not configured in database. Please contact support.',
+      });
+      return;
+    }
     const merchantName = 'BaaziBoard';
 
     // Standard UPI deep link specification (pre-fills payee UPI ID, payee name, amount, currency)
@@ -228,14 +235,15 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
       return;
     }
 
-    if (!utr.trim() || utr.trim().length < 6) {
-      setFeedback({ type: 'error', message: 'Please enter a valid 12-digit UTR / Reference ID' });
+    const cleanUtr = utr.trim().replace(/[^a-zA-Z0-9]/g, '');
+    if (!cleanUtr || cleanUtr.length !== 12) {
+      setFeedback({ type: 'error', message: 'Please enter a valid 12-digit transaction reference number' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await submitDepositUTR(numAmt, utr.trim(), 'UPI_QR', depositScreenshot, paymentTime);
+      const res = await submitDepositUTR(numAmt, cleanUtr, 'UPI_QR', depositScreenshot, paymentTime);
       setFeedback({ type: 'success', message: res.message });
       setUtr('');
       setDepositScreenshot('');
@@ -521,7 +529,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                     <p className="text-xs text-slate-400">Scan this QR code with any UPI app to pay ₹{amount || '0'}.</p>
 
                     <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-amber-400">{config?.upiId || 'baazigames@upi'}</span>
+                      <span className="text-xs font-mono font-bold text-amber-400">
+                        {loadingConfig ? 'Syncing UPI ID...' : config?.upiId || 'No UPI ID Configured'}
+                      </span>
                       <button
                         type="button"
                         onClick={handleCopyUpi}
@@ -547,11 +557,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, i
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">12-Digit Bank UTR / Ref Number</label>
+                  <label className="text-xs font-bold text-slate-400 uppercase">12-Digit Transaction Reference Number</label>
                   <input
                     type="text"
                     value={utr}
-                    onChange={(e) => setUtr(e.target.value)}
+                    maxLength={12}
+                    onChange={(e) => setUtr(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12))}
                     placeholder="e.g. 421890123456"
                     className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-white font-mono font-bold text-sm focus:border-emerald-500 outline-none uppercase"
                     required

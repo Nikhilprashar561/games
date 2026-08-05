@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, LogOut, X } from 'lucide-react';
+import { AlertTriangle, LogOut, X, Info } from 'lucide-react';
 
 interface GameConfirmModalProps {
   isOpen: boolean;
@@ -27,49 +27,65 @@ export const GameConfirmModal: React.FC<GameConfirmModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-md p-6 sm:p-8 glass-panel rounded-3xl border border-slate-800 shadow-2xl bg-[#0a0f1d] text-white overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-7 glass-panel rounded-3xl border border-slate-800 shadow-2xl bg-[#0a0f1d] text-white flex flex-col justify-between">
         
-        {/* Ambient Glow */}
-        <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
-          variant === 'danger' ? 'bg-rose-500/20' : 'bg-amber-500/20'
-        }`}></div>
+        {/* Ambient Backlight */}
+        <div
+          className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
+            variant === 'danger'
+              ? 'bg-rose-500/20'
+              : variant === 'warning'
+              ? 'bg-amber-500/20'
+              : 'bg-emerald-500/20'
+          }`}
+        ></div>
 
-        {/* Close Button */}
+        {/* Top Close Icon Button */}
         <button
           onClick={onCancel}
+          type="button"
+          aria-label="Close modal"
           className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-100 rounded-full hover:bg-slate-800/60 transition-colors"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
-        {/* Header Icon */}
-        <div className="text-center mb-5">
-          <div className={`inline-flex items-center justify-center w-14 h-14 mb-3 rounded-2xl shadow-lg ${
-            variant === 'danger'
-              ? 'bg-rose-500/20 border border-rose-500/40 text-rose-400 shadow-rose-500/20'
-              : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 shadow-amber-500/20'
-          }`}>
+        {/* Header & Message */}
+        <div className="text-center my-2 sm:my-3">
+          <div
+            className={`inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 mb-3 rounded-2xl shadow-lg shrink-0 ${
+              variant === 'danger'
+                ? 'bg-rose-500/15 border border-rose-500/30 text-rose-400 shadow-rose-500/10'
+                : variant === 'warning'
+                ? 'bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-amber-500/10'
+                : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-emerald-500/10'
+            }`}
+          >
             {variant === 'danger' ? (
-              <LogOut className="w-7 h-7" />
+              <LogOut className="w-6 h-6 sm:w-7 sm:h-7" />
+            ) : variant === 'warning' ? (
+              <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7" />
             ) : (
-              <AlertTriangle className="w-7 h-7" />
+              <Info className="w-6 h-6 sm:w-7 sm:h-7" />
             )}
           </div>
-          <h3 className="text-xl font-black text-white font-['Space_Grotesk'] tracking-tight">
+
+          <h3 className="text-lg sm:text-xl font-black text-white font-['Space_Grotesk'] tracking-tight">
             {title}
           </h3>
-          <p className="text-xs text-slate-300 mt-2 leading-relaxed font-semibold">
+
+          <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed font-semibold max-w-xs mx-auto">
             {message}
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-3 pt-2">
+        {/* Responsive Action Buttons (Stacked on Mobile, Row on Tablet/Desktop) */}
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-4 border-t border-slate-800/60 mt-4">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold text-xs sm:text-sm border border-slate-700 transition-all text-center"
+            className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-extrabold text-xs sm:text-sm border border-slate-700 transition-all text-center"
           >
             {cancelText}
           </button>
@@ -77,10 +93,12 @@ export const GameConfirmModal: React.FC<GameConfirmModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-3 px-4 rounded-xl font-extrabold text-xs sm:text-sm text-white shadow-lg transition-all text-center ${
+            className={`w-full sm:flex-1 py-3 px-4 rounded-2xl font-extrabold text-xs sm:text-sm text-white shadow-lg transition-all text-center ${
               variant === 'danger'
                 ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-rose-500/25'
-                : 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 shadow-amber-500/25'
+                : variant === 'warning'
+                ? 'bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 shadow-amber-500/25'
+                : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/25'
             }`}
           >
             {confirmText}

@@ -14,7 +14,7 @@ type BoardState = Array<string | null>;
 
 export default function TicTacToePage() {
   const router = useRouter();
-  const { user, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
@@ -134,21 +134,23 @@ export default function TicTacToePage() {
     }, 1200); // 1.2s Human AI response latency
   };
 
-  // Immediate Upfront Entry Fee Deduction & Start Match
+  // Match Entry Validation & Room Initialization (Settlement handled by backend)
   const startMatch = () => {
     if (!user) {
       openAuthModal();
       return;
     }
 
-    const currentDemoCoins = user?.demoBalance !== undefined ? user.demoBalance : 1000;
-    if (currentDemoCoins < ENTRY_COST) {
-      alert(`Insufficient Demo Coins balance! You need 🪙 ${ENTRY_COST} Demo Coins to enter. Your balance is 🪙 ${formatCoins(currentDemoCoins)}.`);
+    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
+    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
+      showToast(
+        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
+          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
+        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
+        'error'
+      );
       return;
     }
-
-    // DEDUCT ENTRY FEE IMMEDIATELY BEFORE GAME STARTS
-    updateDemoBalance(-ENTRY_COST);
 
     setBoard(Array(9).fill(null));
     setIsXNext(true);

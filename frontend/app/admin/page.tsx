@@ -436,7 +436,7 @@ export default function AdminPage() {
           <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Online Players</span>
           <div className="flex items-center justify-between">
             <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">
-              {stats?.onlineUsersCount || Math.max(1, (stats?.totalUsers || usersList.length || 0) - 1)}
+              {stats?.onlineUsersCount ?? usersList.length}
             </span>
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -449,7 +449,7 @@ export default function AdminPage() {
           <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Currently Playing</span>
           <div className="flex items-center justify-between">
             <span className="text-xl font-black text-amber-300 font-['Space_Grotesk']">
-              {stats?.activeGamesCount || 4}
+              {stats?.activeGamesCount ?? 0}
             </span>
             <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5" />
@@ -461,7 +461,7 @@ export default function AdminPage() {
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">House Commission</span>
           <div className="flex items-center justify-between">
             <span className="text-xl font-black text-emerald-400 font-['Space_Grotesk']">
-              ₹{formatCurrency(totalHouseCommission || stats?.netRevenue || 0)}
+              ₹{formatCurrency(totalHouseCommission || stats?.totalAdminCommission || 0)}
             </span>
             <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">
               <Trophy className="w-3.5 h-3.5" />
@@ -470,10 +470,10 @@ export default function AdminPage() {
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending UTRs</span>
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Verification</span>
           <div className="flex items-center justify-between">
             <span className="text-xl font-black text-amber-400 font-['Space_Grotesk']">
-              {stats?.pendingCount || 0}
+              {stats?.pendingCount ?? 0}
             </span>
             <span className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center animate-pulse">
               <Clock className="w-3.5 h-3.5" />
@@ -482,10 +482,10 @@ export default function AdminPage() {
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Revenue</span>
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Deposits</span>
           <div className="flex items-center justify-between">
             <span className="text-xl font-black text-white font-['Space_Grotesk']">
-              ₹{formatCurrency(stats?.totalDepositAmount || 0)}
+              ₹{formatCurrency(stats?.totalRealDeposits || 0)}
             </span>
             <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">
               ₹
@@ -505,7 +505,7 @@ export default function AdminPage() {
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>UTR Verification Queue ({deposits.length})</span>
+          <span>Payment Requests Queue ({deposits.length})</span>
         </button>
 
         <button
@@ -529,7 +529,7 @@ export default function AdminPage() {
           }`}
         >
           <QrCode className="w-4 h-4" />
-          <span>Gallery QR Code Upload & UPI Settings</span>
+          <span>Payment QR Code & UPI Settings</span>
         </button>
 
         <button
@@ -541,7 +541,7 @@ export default function AdminPage() {
           }`}
         >
           <Trophy className="w-4 h-4" />
-          <span>Customer Betting & Game Logs</span>
+          <span>Player Match & Payment Records</span>
         </button>
       </div>
 
@@ -563,7 +563,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* TAB 1: UTR VERIFICATION QUEUE */}
+      {/* TAB 1: PAYMENT REQUESTS QUEUE */}
       {activeTab === 'QUEUE' && (
         <div className="space-y-6">
           
@@ -571,12 +571,12 @@ export default function AdminPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             
             {/* Status Filters */}
-            <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs font-bold w-full md:w-auto">
+            <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs font-bold w-full md:w-auto overflow-x-auto">
               {['PENDING', 'APPROVED', 'REJECTED', 'ALL'].map((st) => (
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
-                  className={`px-4 py-2 rounded-xl transition-all ${
+                  className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                     statusFilter === st
                       ? 'bg-amber-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-white'
@@ -587,12 +587,12 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* UTR Search Input */}
+            {/* Reference Search Input */}
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search UTR ID or User Email..."
+                placeholder="Search Reference No. or Email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
@@ -601,17 +601,17 @@ export default function AdminPage() {
 
           </div>
 
-          {/* Table of Deposit & Withdrawal Requests */}
+          {/* Responsive Table of Deposit & Withdrawal Requests */}
           <div className="glass-panel rounded-3xl border border-slate-800 shadow-2xl overflow-hidden bg-[#0a0f1d]">
             {loadingDeposits ? (
               <div className="py-16 text-center">
                 <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-xs text-slate-400 mt-3 font-semibold">Loading UTR requests...</p>
+                <p className="text-xs text-slate-400 mt-3 font-semibold">Loading payment requests...</p>
               </div>
             ) : deposits.length === 0 ? (
               <div className="py-16 text-center space-y-3">
                 <Clock className="w-12 h-12 text-slate-600 mx-auto" />
-                <p className="text-base font-bold text-slate-300">No deposit requests found in this view</p>
+                <p className="text-base font-bold text-slate-300">No payment requests found in this view</p>
                 <button
                   onClick={() => handleGenerateTestDeposit(500)}
                   className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-extrabold shadow-lg"
@@ -621,63 +621,63 @@ export default function AdminPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs text-slate-300 table-auto min-w-[700px]">
                   <thead className="bg-slate-900/90 uppercase text-[11px] font-extrabold text-slate-400 border-b border-slate-800">
                     <tr>
-                      <th className="py-4 px-4">User Details</th>
-                      <th className="py-4 px-4">Type & Amount</th>
-                      <th className="py-4 px-4">UTR / Transaction ID</th>
-                      <th className="py-4 px-4">Submitted Date</th>
-                      <th className="py-4 px-4">Status</th>
-                      <th className="py-4 px-4 text-right">Verification Action</th>
+                      <th className="py-4 px-4 min-w-[160px]">User Details</th>
+                      <th className="py-4 px-4 min-w-[130px]">Type & Amount</th>
+                      <th className="py-4 px-4 min-w-[150px]">Reference No.</th>
+                      <th className="py-4 px-4 min-w-[130px]">Submitted Date</th>
+                      <th className="py-4 px-4 min-w-[120px]">Status</th>
+                      <th className="py-4 px-4 text-right min-w-[160px]">Verification Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
                     {deposits.map((req) => (
                       <tr key={req._id} className="hover:bg-slate-900/40 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="font-extrabold text-white text-sm">{req.userName}</div>
-                          <div className="text-slate-400 text-xs">{req.userEmail}</div>
+                        <td className="py-4 px-4 max-w-[200px]">
+                          <div className="font-extrabold text-white text-sm truncate">{req.userName}</div>
+                          <div className="text-slate-400 text-xs truncate">{req.userEmail}</div>
                           {req.upiOrBankDetails && (
-                            <div className="text-[11px] text-amber-400 font-semibold mt-0.5">
+                            <div className="text-[11px] text-amber-400 font-semibold mt-0.5 truncate">
                               Payout Info: {req.upiOrBankDetails}
                             </div>
                           )}
                         </td>
 
                         <td className="py-4 px-4">
-                          <span className={`font-black text-sm ${req.type === 'DEPOSIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          <span className={`font-black text-sm block ${req.type === 'DEPOSIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
                             {req.type === 'DEPOSIT' ? '➕ Deposit' : '➖ Withdrawal'} ₹{formatCurrency(req.amount)}
                           </span>
                           <span className="block text-[10px] text-slate-400 font-bold uppercase">{req.paymentMethod}</span>
                         </td>
 
                         <td className="py-4 px-4">
-                          <span className="font-mono font-bold text-amber-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs inline-block">
-                            {req.utr}
+                          <span className="font-mono font-bold text-amber-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-xs inline-block max-w-[140px] truncate" title={String(req.utr)}>
+                            {String(req.utr || '').slice(0, 12)}
                           </span>
                         </td>
 
-                        <td className="py-4 px-4 font-semibold text-slate-400">
+                        <td className="py-4 px-4 font-semibold text-slate-400 whitespace-nowrap">
                           {new Date(req.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                         </td>
 
                         <td className="py-4 px-4">
                           {req.status === 'PENDING' && (
-                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[11px] animate-pulse">
+                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[11px] animate-pulse whitespace-nowrap">
                               <Clock className="w-3.5 h-3.5" />
-                              <span>Pending Verification</span>
+                              <span>Pending</span>
                             </span>
                           )}
                           {req.status === 'APPROVED' && (
-                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[11px]">
+                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[11px] whitespace-nowrap">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Approved</span>
                             </span>
                           )}
                           {req.status === 'REJECTED' && (
-                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[11px]">
+                            <span className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[11px] whitespace-nowrap">
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Rejected</span>
                             </span>
@@ -690,10 +690,10 @@ export default function AdminPage() {
                               <button
                                 onClick={() => handleApprove(req._id)}
                                 disabled={processingId === req._id}
-                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1"
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1 whitespace-nowrap"
                               >
                                 <Check className="w-3.5 h-3.5" />
-                                <span>Approve UTR</span>
+                                <span>Approve</span>
                               </button>
 
                               <button

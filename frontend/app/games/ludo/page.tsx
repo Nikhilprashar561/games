@@ -200,7 +200,7 @@ function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rol
 const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (max - min));
 
 export default function LudoPage() {
-  const { user, updateWalletBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
   const router = useRouter();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
@@ -280,16 +280,21 @@ export default function LudoPage() {
       openAuthModal();
       return;
     }
-    if (playMode === 'DEMO') {
-      showToast('🔒 Real Money Mode Required: Switch to REAL MONEY mode in top header navbar to play paid games!', 'warning');
+    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
+    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
+      showToast(
+        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
+          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
+        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
+        'error'
+      );
       return;
     }
-    const currentBalance = user?.walletBalance || 0;
-    if (currentBalance < ENTRY_COST) {
-      showToast(`Insufficient Real Money balance! Entry fee is ₹${ENTRY_COST}. Current balance: ₹${formatCurrency(currentBalance)}.`, 'error');
-      return;
+    if (playMode === 'REAL') {
+      await updateWalletBalance(-ENTRY_COST);
+    } else {
+      updateDemoBalance(-ENTRY_COST);
     }
-    await updateWalletBalance(-ENTRY_COST);
     setHasPaidEntry(true);
     const freshTokens: Record<PlayerColor, Token[]> = {
       red: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'red', position: -1, stepCount: 0 })),

@@ -48,8 +48,9 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Minimum deposit amount is ₹10' });
     }
 
-    if (!cleanUtr || cleanUtr.length < 6 || !/^[A-Z0-9]+$/.test(cleanUtr)) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid 12-digit UTR / Reference ID containing numbers and letters only' });
+    const sanitizedUtr = cleanUtr.replace(/[^A-Z0-9]/g, '').slice(0, 12);
+    if (!sanitizedUtr || sanitizedUtr.length !== 12) {
+      return res.status(400).json({ success: false, message: 'Transaction reference number must be exactly 12 digits/characters' });
     }
 
     // Check if user submitted another deposit in the last 15 seconds (Anti-spam rate limit)
@@ -65,11 +66,11 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
     }
 
     // Check if UTR was already submitted
-    const existingReq = await DepositRequest.findOne({ utr: cleanUtr });
+    const existingReq = await DepositRequest.findOne({ utr: sanitizedUtr });
     if (existingReq) {
       return res.status(400).json({
         success: false,
-        message: `This UTR (${cleanUtr}) has already been submitted (Status: ${existingReq.status})`,
+        message: `This transaction reference number (${sanitizedUtr}) has already been submitted (Status: ${existingReq.status})`,
       });
     }
 
@@ -84,7 +85,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       finalScreenshotUrl = await uploadImageToCloudinary(paymentScreenshotUrl, 'baazi_user_deposits');
     }
 
-    const isAutoVerifiable = cleanUtr.startsWith('VERIFY') || cleanUtr.startsWith('AUTO') || cleanUtr.startsWith('TEST');
+    const isAutoVerifiable = sanitizedUtr.startsWith('VERIFY') || sanitizedUtr.startsWith('AUTO') || sanitizedUtr.startsWith('TEST');
     let initialStatus: 'PENDING' | 'APPROVED' = 'PENDING';
     let autoNote = 'Submitted for Admin Screenshot Verification';
 
@@ -101,7 +102,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
         type: 'DEPOSIT',
         amount: cleanAmount,
         balanceAfter: user.walletBalance,
-        description: `Auto-Verified UPI Deposit (UTR: ${cleanUtr})`,
+        description: `Auto-Verified UPI Deposit (Reference: ${sanitizedUtr})`,
         proofScreenshotUrl: finalScreenshotUrl,
       });
     }
@@ -111,7 +112,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       userEmail: user.email,
       userName: user.name,
       amount: cleanAmount,
-      utr: cleanUtr,
+      utr: sanitizedUtr,
       type: 'DEPOSIT',
       paymentMethod: paymentMethod || 'UPI_QR',
       paymentScreenshotUrl: finalScreenshotUrl,
@@ -125,7 +126,7 @@ export const submitDepositUTR = async (req: AuthRequest, res: Response) => {
       success: true,
       message: initialStatus === 'APPROVED'
         ? `⚡ Instant Verification Success! ₹${cleanAmount} has been credited to your wallet!`
-        : `Deposit request for ₹${cleanAmount} (UTR: ${cleanUtr}) submitted with payment proof! Admin verification in progress.`,
+        : `Deposit request for ₹${cleanAmount} (Reference: ${sanitizedUtr}) submitted with payment proof! Admin verification in progress.`,
       depositRequest: depositReq,
       updatedBalance: user.walletBalance,
     });

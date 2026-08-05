@@ -175,7 +175,7 @@ export const Navbar: React.FC = () => {
                 <div className="flex items-center bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-emerald-500/20 border border-emerald-500/40 rounded-xl sm:rounded-2xl p-0.5 shadow-md">
                   <div className="flex items-center space-x-1 px-2 py-1 sm:px-3 sm:py-1 text-emerald-400 font-black text-xs sm:text-sm">
                     <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-                    <span>₹{walletDisplayBalance}</span>
+                    <span>{loading && !user ? '...' : `₹${walletDisplayBalance}`}</span>
                   </div>
                   <button
                     onClick={() => openDepositModal('DEPOSIT')}
@@ -189,7 +189,7 @@ export const Navbar: React.FC = () => {
               ) : (
                 <div className="flex items-center space-x-1 px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs sm:text-sm shadow-md">
                   <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 fill-amber-400/20" />
-                  <span>🪙 {demoDisplayCoins}</span>
+                  <span>🪙 {loading && !user ? '...' : demoDisplayCoins}</span>
                 </div>
               )}
 

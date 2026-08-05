@@ -23,7 +23,6 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
     let amountLost = 0;
     let adminCommission = 0;
     let winnerPayoutShare = 0;
-    let balanceDelta = 0;
 
     const totalPot = 2 * fee;
 
@@ -32,14 +31,11 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
       if (result === 'WIN') {
         amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : Math.round(fee * 1.8);
         winnerPayoutShare = amountWon;
-        balanceDelta = amountWon;
       } else if (result === 'LOSS') {
         amountWon = 0;
         amountLost = fee;
-        balanceDelta = 0;
       } else {
         amountWon = fee;
-        balanceDelta = fee;
       }
     } else {
       if (result === 'WIN') {
@@ -47,20 +43,19 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
         adminCommission = Math.round(totalPot * 0.10 * 100) / 100;
         winnerPayoutShare = Math.round((totalPot - adminCommission) * 100) / 100;
         amountWon = req.body.amountWon !== undefined ? Number(req.body.amountWon) : winnerPayoutShare;
-        balanceDelta = amountWon;
       } else if (result === 'LOSS') {
         amountWon = 0;
         amountLost = fee;
         adminCommission = fee; // Whole bet amount transferred to admin share
-        balanceDelta = 0;
       } else if (result === 'DRAW') {
         amountWon = fee;
         adminCommission = 0;
-        balanceDelta = fee;
       }
     }
 
-    const netAmount = Math.round((amountWon - fee) * 100) / 100;
+    // Exact net delta to apply to user DB balance (WIN: +netProfit, LOSS: -entryFee, DRAW: 0)
+    const netDelta = Math.round((amountWon - fee) * 100) / 100;
+    const netAmount = netDelta;
 
     try {
       const user = await User.findById(req.user.id);
@@ -68,17 +63,14 @@ export const settleGameMatch = async (req: AuthRequest, res: Response) => {
         return res.status(404).json({ success: false, message: 'User account not found' });
       }
 
-      const walletBalanceBefore = mode === 'REAL' ? (user.walletBalance || 0) : (user.demoBalance || 1000);
+      const walletBalanceBefore = mode === 'REAL' ? (user.walletBalance || 0) : (user.demoBalance !== undefined ? user.demoBalance : 1000);
 
       if (mode === 'REAL') {
-        if (result === 'LOSS' && (user.walletBalance || 0) < fee) {
-          user.walletBalance = 0;
-        } else {
-          user.walletBalance = Math.max(0, Math.round(((user.walletBalance || 0) + balanceDelta) * 100) / 100);
-        }
+        const curReal = user.walletBalance || 0;
+        user.walletBalance = Math.max(0, Math.round((curReal + netDelta) * 100) / 100);
       } else {
-        const currentDemo = user.demoBalance !== undefined ? user.demoBalance : 1000;
-        user.demoBalance = Math.max(0, currentDemo + balanceDelta);
+        const curDemo = user.demoBalance !== undefined ? user.demoBalance : 1000;
+        user.demoBalance = Math.max(0, Math.round((curDemo + netDelta) * 100) / 100);
       }
 
       await user.save();
