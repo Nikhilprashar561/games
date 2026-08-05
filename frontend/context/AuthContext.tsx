@@ -5,6 +5,8 @@ import axios from 'axios';
 import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
 import { User, GameMatchLog, GameStats, DepositRequest, WithdrawalRequest, WalletTransaction, AdminSettings } from '../types';
 import { ToastContainer, ToastItem } from '../components/ToastContainer';
+import { AddMoneyModal } from '../components/AddMoneyModal';
+import { formatCurrency, formatCoins } from '../utils/formatCurrency';
 
 export type PlayMode = 'REAL' | 'DEMO';
 
@@ -19,6 +21,10 @@ interface AuthContextType {
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  isAddMoneyOpen: boolean;
+  addMoneyTab: 'DEPOSIT' | 'STATUS' | 'WITHDRAW';
+  openAddMoneyModal: (tab?: 'DEPOSIT' | 'STATUS' | 'WITHDRAW') => void;
+  closeAddMoneyModal: () => void;
   sendOTP: (email: string) => Promise<{ isExistingUser: boolean }>;
   verifyOTP: (email: string, otp: string) => Promise<void>;
   login: (email: string) => Promise<void>;
@@ -39,6 +45,7 @@ interface AuthContextType {
   ) => Promise<void>;
   quitGameMatch: (gameSlug: string, gameTitle: string, entryFee?: number, opponentName?: string) => Promise<void>;
   fetchMatchHistory: (gameSlug?: string, mode?: 'REAL' | 'DEMO') => Promise<{ stats: GameStats; logs: GameMatchLog[] }>;
+  verifyGameEligibility: (gameSlug: string, entryCost: number, targetPlayMode?: 'REAL' | 'DEMO') => Promise<boolean>;
   openRazorpayCheckout: (amount: number) => void;
 
   // UTR & Deposit API
@@ -95,6 +102,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
   const [playMode, setPlayModeState] = useState<PlayMode>('REAL');
+  const [isAddMoneyOpen, setIsAddMoneyOpen] = useState<boolean>(false);
+  const [addMoneyTab, setAddMoneyTab] = useState<'DEPOSIT' | 'STATUS' | 'WITHDRAW'>('DEPOSIT');
+
+  const openAddMoneyModal = (tab: 'DEPOSIT' | 'STATUS' | 'WITHDRAW' = 'DEPOSIT') => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setAddMoneyTab(tab);
+    setIsAddMoneyOpen(true);
+  };
+
+  const closeAddMoneyModal = () => {
+    setIsAddMoneyOpen(false);
+  };
 
   // Fetch live user profile & wallet balance directly from MongoDB
   const fetchUserProfile = async (authToken?: string) => {
@@ -484,6 +506,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const verifyGameEligibility = async (
+    gameSlug: string,
+    entryCost: number,
+    targetPlayMode?: 'REAL' | 'DEMO'
+  ): Promise<boolean> => {
+    if (!user) {
+      openAuthModal();
+      return false;
+    }
+
+    const mode = targetPlayMode || playMode;
+
+    if (token) {
+      try {
+        const res = await axios.post('/api/games/check-eligibility', {
+          gameSlug,
+          entryCost,
+          playMode: mode,
+        });
+
+        if (res.data.success) {
+          if (res.data.user) {
+            const updated = {
+              ...user,
+              walletBalance: res.data.user.walletBalance,
+              demoBalance: res.data.user.demoBalance,
+            };
+            setUser(updated);
+            localStorage.setItem('user_session', JSON.stringify(updated));
+          }
+
+          if (!res.data.eligible) {
+            const shortfallMsg = mode === 'REAL'
+              ? `Insufficient balance! Game entry is ₹${entryCost}, but your account balance is ₹${formatCurrency(res.data.currentBalance)}. Please add ₹${formatCurrency(res.data.shortfall)} to play.`
+              : `Insufficient Demo Coins! Entry fee is 🪙 ${entryCost}, but your balance is 🪙 ${res.data.currentBalance}.`;
+            
+            showToast(shortfallMsg, 'error');
+
+            if (mode === 'REAL') {
+              setTimeout(() => {
+                setIsAddMoneyOpen(true);
+              }, 250);
+            }
+            return false;
+          }
+
+          return true;
+        }
+      } catch (err: any) {
+        // Fallback check
+      }
+    }
+
+    const currentBalance = mode === 'REAL' ? (user.walletBalance || 0) : (user.demoBalance !== undefined ? user.demoBalance : 1000);
+    if (currentBalance < entryCost) {
+      const shortfallMsg = mode === 'REAL'
+        ? `Insufficient balance! Game entry is ₹${entryCost}, but your account balance is ₹${formatCurrency(currentBalance)}. Please add ₹${formatCurrency(entryCost - currentBalance)} to play.`
+        : `Insufficient Demo Coins! Entry fee is 🪙 ${entryCost}, but your balance is 🪙 ${currentBalance}.`;
+
+      showToast(shortfallMsg, 'error');
+
+      if (mode === 'REAL') {
+        setTimeout(() => {
+          setIsAddMoneyOpen(true);
+        }, 250);
+      }
+      return false;
+    }
+
+    return true;
+  };
+
   const fetchMatchHistory = async (gameSlug?: string, mode: 'REAL' | 'DEMO' = 'REAL'): Promise<{ stats: GameStats; logs: GameMatchLog[] }> => {
     if (token) {
       try {
@@ -836,6 +930,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         recordGameMatch,
         quitGameMatch,
         fetchMatchHistory,
+        verifyGameEligibility,
         openRazorpayCheckout,
         submitDepositUTR,
         submitWithdrawal,
@@ -853,6 +948,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         adminRejectWithdrawal,
         updateAdminConfig,
         fetchAdminStats,
+        isAddMoneyOpen,
+        addMoneyTab,
+        openAddMoneyModal,
+        closeAddMoneyModal,
         fetchAdminUsers,
         adminAdjustUserBalance,
         adminCreateTestDeposit,
@@ -861,6 +960,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }}
     >
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <AddMoneyModal isOpen={isAddMoneyOpen} onClose={closeAddMoneyModal} initialTab={addMoneyTab} />
       {children}
     </AuthContext.Provider>
   );

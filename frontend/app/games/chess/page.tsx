@@ -16,7 +16,7 @@ import { Chess, Square, PieceSymbol } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 
 export default function ChessPage() {
-  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, showToast, verifyGameEligibility } = useAuth();
   const router = useRouter();
 
   // Entry fees & rewards for Real Cash and Demo Mode
@@ -335,31 +335,15 @@ export default function ChessPage() {
     setPendingPromotion(null);
   };
 
-  // Start New Chess Match & Deduct Entry Fee from Wallet
+  // Start New Chess Match (Live DB Verification)
   const handleStartMatch = async () => {
     if (!user) {
       openAuthModal();
       return;
     }
 
-    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance || 0) : (user?.walletBalance || 0);
-
-    if (currentBalance < currentEntryCost) {
-      showToast(
-        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
-          playMode === 'DEMO' ? formatCoins(currentEntryCost) : `₹${currentEntryCost}`
-        }. Current: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}.`,
-        'error'
-      );
-      return;
-    }
-
-    // Deduct entry fee via context wallet logic
-    if (playMode === 'DEMO') {
-      await updateDemoBalance(-currentEntryCost);
-    } else {
-      await updateWalletBalance(-currentEntryCost);
-    }
+    const isEligible = await verifyGameEligibility('chess', currentEntryCost, playMode);
+    if (!isEligible) return;
 
     const newGame = new Chess();
     setGame(newGame);

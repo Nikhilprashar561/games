@@ -11,15 +11,22 @@ interface GameCardProps {
 }
 
 export const GameCard: React.FC<GameCardProps> = ({ game }) => {
-  const { user, openAuthModal, playMode } = useAuth();
+  const { user, openAuthModal, playMode, verifyGameEligibility } = useAuth();
   const router = useRouter();
 
-  const handleCardClick = () => {
+  const handleCardClick = async () => {
     if (game.isProtected && !user) {
       openAuthModal();
-    } else {
-      router.push(`/games/${game.slug}`);
+      return;
     }
+
+    // Live DB verification before navigating to paid game
+    if (user && playMode === 'REAL' && game.slug !== 'tic-tac-toe') {
+      const isEligible = await verifyGameEligibility(game.slug, game.entryFee || 10, 'REAL');
+      if (!isEligible) return;
+    }
+
+    router.push(`/games/${game.slug}`);
   };
 
   return (

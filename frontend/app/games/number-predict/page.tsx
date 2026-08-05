@@ -60,7 +60,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function NumberPredictPage() {
-  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast, verifyGameEligibility } = useAuth();
   const router = useRouter();
 
   const [confirmModal, setConfirmModal] = useState<{
@@ -104,22 +104,9 @@ export default function NumberPredictPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
-    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
-      showToast(
-        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
-          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
-        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
-        'error'
-      );
-      return;
-    }
+    const isEligible = await verifyGameEligibility('number-predict', ENTRY_COST, playMode);
+    if (!isEligible) return;
 
-    if (playMode === 'REAL') {
-      await updateWalletBalance(-ENTRY_COST);
-    } else {
-      updateDemoBalance(-ENTRY_COST);
-    }
     initializeVault();
     setHasEntered(true);
     setFlippedIndex(null);

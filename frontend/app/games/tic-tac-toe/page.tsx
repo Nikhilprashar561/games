@@ -14,7 +14,7 @@ type BoardState = Array<string | null>;
 
 export default function TicTacToePage() {
   const router = useRouter();
-  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast, verifyGameEligibility } = useAuth();
   
   const ENTRY_COST = 10;
   const WIN_REWARD = 17.6;
@@ -134,23 +134,15 @@ export default function TicTacToePage() {
     }, 1200); // 1.2s Human AI response latency
   };
 
-  // Match Entry Validation & Room Initialization (Settlement handled by backend)
-  const startMatch = () => {
+  // Live DB Verification & Room Initialization
+  const startMatch = async () => {
     if (!user) {
       openAuthModal();
       return;
     }
 
-    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
-    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
-      showToast(
-        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
-          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
-        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
-        'error'
-      );
-      return;
-    }
+    const isEligible = await verifyGameEligibility('tic-tac-toe', ENTRY_COST, playMode);
+    if (!isEligible) return;
 
     setBoard(Array(9).fill(null));
     setIsXNext(true);

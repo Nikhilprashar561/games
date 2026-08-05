@@ -289,3 +289,42 @@ export const getAllGameLogs = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success: false, message: error.message || 'Server error fetching game logs' });
   }
 };
+
+// @desc    Check Live DB User Balance Eligibility before Match Start / Room Join
+// @route   POST /api/games/check-eligibility
+export const checkGameEligibility = async (req: AuthRequest, res: Response) => {
+  try {
+    const { gameSlug, entryCost, playMode } = req.body;
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const cost = Number(entryCost) || 10;
+    const mode = playMode === 'DEMO' ? 'DEMO' : 'REAL';
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found' });
+    }
+
+    const currentBalance = mode === 'REAL' ? (user.walletBalance || 0) : (user.demoBalance !== undefined ? user.demoBalance : 1000);
+    const eligible = currentBalance >= cost;
+    const shortfall = eligible ? 0 : Math.round((cost - currentBalance) * 100) / 100;
+
+    return res.json({
+      success: true,
+      eligible,
+      currentBalance,
+      requiredAmount: cost,
+      shortfall,
+      playMode: mode,
+      user: {
+        id: user._id,
+        walletBalance: user.walletBalance,
+        demoBalance: user.demoBalance,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to verify balance' });
+  }
+};

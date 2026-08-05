@@ -200,7 +200,7 @@ function Dice3D({ rotation, rolling }: { rotation: { x: number; y: number }; rol
 const jitter = (min: number, max: number) => Math.floor(min + Math.random() * (max - min));
 
 export default function LudoPage() {
-  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast, verifyGameEligibility } = useAuth();
   const router = useRouter();
   const ENTRY_COST = 25;
   const WIN_REWARD = 44;
@@ -280,21 +280,10 @@ export default function LudoPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
-    if (currentBalance <= 0 || currentBalance < ENTRY_COST) {
-      showToast(
-        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
-          playMode === 'DEMO' ? formatCoins(ENTRY_COST) : `₹${ENTRY_COST}`
-        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
-        'error'
-      );
-      return;
-    }
-    if (playMode === 'REAL') {
-      await updateWalletBalance(-ENTRY_COST);
-    } else {
-      updateDemoBalance(-ENTRY_COST);
-    }
+
+    const isEligible = await verifyGameEligibility('ludo', ENTRY_COST, playMode);
+    if (!isEligible) return;
+
     setHasPaidEntry(true);
     const freshTokens: Record<PlayerColor, Token[]> = {
       red: Array.from({ length: 4 }, (_, i) => ({ id: i, color: 'red', position: -1, stepCount: 0 })),

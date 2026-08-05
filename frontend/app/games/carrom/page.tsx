@@ -189,7 +189,7 @@ const colorHex: Record<PieceKind, string> = {
  * COMPONENT
  * ==========================================================================*/
 export default function CarromPage() {
-  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast } = useAuth();
+  const { user, updateWalletBalance, updateDemoBalance, recordGameMatch, openAuthModal, playMode, setPlayMode, showToast, verifyGameEligibility } = useAuth();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -301,21 +301,10 @@ export default function CarromPage() {
       openAuthModal();
       return;
     }
-    const currentBalance = playMode === 'DEMO' ? (user?.demoBalance !== undefined ? user.demoBalance : 1000) : (user?.walletBalance || 0);
-    if (currentBalance <= 0 || currentBalance < entryCost) {
-      showToast(
-        `Insufficient ${playMode === 'DEMO' ? 'Demo Coins' : 'Real Money'} balance! Entry fee is ${
-          playMode === 'DEMO' ? formatCoins(entryCost) : `₹${entryCost}`
-        }. Current balance: ${playMode === 'DEMO' ? formatCoins(currentBalance) : `₹${formatCurrency(currentBalance)}`}. Please add funds to play.`,
-        'error'
-      );
-      return;
-    }
-    if (playMode === 'REAL') {
-      await updateWalletBalance(-entryCost);
-    } else {
-      updateDemoBalance(-entryCost);
-    }
+
+    const isEligible = await verifyGameEligibility('carrom', entryCost, playMode);
+    if (!isEligible) return;
+
     setOpponentName(getRandomOpponentName());
     setHasPaidEntry(true);
     initGame();
