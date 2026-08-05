@@ -383,7 +383,7 @@ export default function SnakeLadderPage() {
       return;
     }
 
-    const isEligible = await verifyGameEligibility('snake-ladder', ENTRY_COST, playMode);
+    const isEligible = await verifyGameEligibility('snake-ladder', ENTRY_COST, 'REAL');
     if (!isEligible) return;
 
     if (aiTurnTimeoutRef.current) clearTimeout(aiTurnTimeoutRef.current);

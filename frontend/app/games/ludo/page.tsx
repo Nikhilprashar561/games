@@ -281,7 +281,7 @@ export default function LudoPage() {
       return;
     }
 
-    const isEligible = await verifyGameEligibility('ludo', ENTRY_COST, playMode);
+    const isEligible = await verifyGameEligibility('ludo', ENTRY_COST, 'REAL');
     if (!isEligible) return;
 
     setHasPaidEntry(true);

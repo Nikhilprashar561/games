@@ -516,7 +516,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
-    const mode = targetPlayMode || playMode;
+    let mode = targetPlayMode || playMode;
+
+    // Demo Mode (Demo Coins) is ONLY applicable to Tic Tac Toe. All other paid games MUST use Real Money Mode.
+    if (gameSlug !== 'tic-tac-toe') {
+      if (playMode === 'DEMO' || mode === 'DEMO') {
+        showToast('Paid games require Real Money Mode! Switching to Real Money Mode...', 'info');
+        setPlayModeState('REAL');
+        localStorage.setItem('baazi_play_mode', 'REAL');
+      }
+      mode = 'REAL';
+    }
 
     if (token) {
       try {

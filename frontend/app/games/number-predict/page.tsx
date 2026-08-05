@@ -104,7 +104,7 @@ export default function NumberPredictPage() {
       openAuthModal();
       return;
     }
-    const isEligible = await verifyGameEligibility('number-predict', ENTRY_COST, playMode);
+    const isEligible = await verifyGameEligibility('number-predict', ENTRY_COST, 'REAL');
     if (!isEligible) return;
 
     initializeVault();

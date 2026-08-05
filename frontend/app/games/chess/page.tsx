@@ -342,7 +342,7 @@ export default function ChessPage() {
       return;
     }
 
-    const isEligible = await verifyGameEligibility('chess', currentEntryCost, playMode);
+    const isEligible = await verifyGameEligibility('chess', REAL_ENTRY_COST, 'REAL');
     if (!isEligible) return;
 
     const newGame = new Chess();

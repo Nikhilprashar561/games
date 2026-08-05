@@ -20,8 +20,8 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
       return;
     }
 
-    // Live DB verification before navigating to paid game
-    if (user && playMode === 'REAL' && game.slug !== 'tic-tac-toe') {
+    // Paid games require Real Money Mode and live DB balance verification
+    if (user && game.slug !== 'tic-tac-toe') {
       const isEligible = await verifyGameEligibility(game.slug, game.entryFee || 10, 'REAL');
       if (!isEligible) return;
     }
@@ -48,7 +48,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game }) => {
 
         {/* Protection / Mode Badge */}
         <div className="absolute top-2.5 left-2.5 flex items-center space-x-1 text-[11px] font-bold shadow-md backdrop-blur-md">
-          {!game.isProtected || game.slug === 'tic-tac-toe' ? (
+          {game.slug === 'tic-tac-toe' ? (
             <span className="bg-amber-600/90 text-white border border-amber-400/40 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
               <Coins className="w-3 h-3 text-amber-300" />
               <span>DEMO COINS</span>

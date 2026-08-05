@@ -302,7 +302,7 @@ export default function CarromPage() {
       return;
     }
 
-    const isEligible = await verifyGameEligibility('carrom', entryCost, playMode);
+    const isEligible = await verifyGameEligibility('carrom', entryCost, 'REAL');
     if (!isEligible) return;
 
     setOpponentName(getRandomOpponentName());
